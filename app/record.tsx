@@ -270,12 +270,12 @@ export default function RecordScreen() {
         <View style={styles.cameraCard}>
           <View style={styles.cameraHeader}>
             <Smartphone size={24} color="#00D4FF" />
-            <Text style={styles.cameraTitle}>Audio Recording</Text>
-            <View style={[styles.statusDot, { backgroundColor: micPerm?.granted ? '#00FF88' : '#FF6B6B' }]} />
+            <Text style={styles.cameraTitle}>Secondary Camera</Text>
+            <View style={[styles.statusDot, { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]} />
           </View>
-          <Text style={styles.cameraDescription}>High-quality audio capture</Text>
-          <Text style={[styles.cameraStatus, { color: micPerm?.granted ? '#00FF88' : '#FF6B6B' }]}>
-            {micPerm?.granted ? 'Ready' : 'Permission Required'}
+          <Text style={styles.cameraDescription}>Mount on back wall (Player 2 side)</Text>
+          <Text style={[styles.cameraStatus, { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]}>
+            {camPerm?.granted ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
       </View>
