@@ -2,19 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { 
-  ArrowLeft, 
-  Smartphone, 
-  Wifi, 
-  WifiOff, 
-  Users, 
-  Play, 
-  Square, 
-  CheckCircle, 
-  AlertCircle,
-  Copy,
-  Camera
-} from 'lucide-react-native';
+import { ArrowLeft, Smartphone, Wifi, WifiOff, Users, Play, Square, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Copy, Camera } from 'lucide-react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 
