@@ -133,7 +133,7 @@ export default function RecordScreen() {
           <Users size={20} color="#00D4FF" />
           <View style={styles.settingContent}>
             <Text style={styles.settingTitle}>Players</Text>
-            <Text style={styles.settingValue}>2 Players</Text>
+            <Text style={styles.settingValue}>4 Players</Text>
           </View>
         </TouchableOpacity>
 
