@@ -179,6 +179,9 @@ export default function AnalyticsScreen() {
           </Text>
         </View>
 
+        <View style={styles.insightCard}>
+          <View style={styles.insightHeader}>
+            <Award size={20} color="#00FF88" />
             <Text style={styles.insightTitle}>Strongest Area</Text>
           </View>
           <Text style={styles.insightValue}>Volleys at the Net</Text>
