@@ -93,6 +93,23 @@ export default function ReportScreen() {
       case 'overview':
         return (
           <View>
+            {/* Video Attachment */}
+            <TouchableOpacity 
+              style={styles.videoThumbnailCard}
+              onPress={() => router.push('/video-player')}
+            >
+              <View style={styles.videoThumbnail}>
+                <View style={styles.videoPreview}>
+                  <Play size={20} color="#fff" />
+                </View>
+                <View style={styles.videoInfo}>
+                  <Text style={styles.videoTitle}>Match Recording</Text>
+                  <Text style={styles.videoDuration}>52:34 • 1080p</Text>
+                  <Text style={styles.videoSize}>1.2 GB</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+
             {/* Match Result */}
             <View style={styles.resultCard}>
               <LinearGradient
