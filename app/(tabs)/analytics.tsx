@@ -6,7 +6,7 @@ import { TrendingUp, Target, Clock, Award, Filter, Calendar, Activity, Users, Za
 const { width } = Dimensions.get('window');
 
 export default function AnalyticsScreen() {
-  const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const [selectedTab, setSelectedTab] = useState('overview');
   const [currentRating] = useState(1547);
   const [ratingHistory] = useState([
     { date: '2024-01-01', rating: 1500 },
@@ -15,11 +15,11 @@ export default function AnalyticsScreen() {
     { date: '2024-01-15', rating: 1547 },
   ]);
 
-  const periods = [
-    { key: 'week', label: 'Week' },
-    { key: 'month', label: 'Month' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'year', label: 'Year' },
+  const tabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'shots', label: 'Shots' },
+    { key: 'movement', label: 'Movement' },
+    { key: 'analysis', label: 'Analysis' }
   ];
 
   // Primary Technical Factors (70% Total Weight)
@@ -124,22 +124,22 @@ export default function AnalyticsScreen() {
         <Text style={styles.headerSubtitle}>Comprehensive Performance Evaluation</Text>
       </LinearGradient>
 
-      {/* Period Selector */}
-      <View style={styles.periodSelector}>
-        {periods.map((period) => (
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        {tabs.map((tab) => (
           <TouchableOpacity
-            key={period.key}
+            key={tab.key}
             style={[
-              styles.periodButton,
-              selectedPeriod === period.key && styles.periodButtonActive
+              styles.tab,
+              selectedTab === tab.key && styles.tabActive
             ]}
-            onPress={() => setSelectedPeriod(period.key)}
+            onPress={() => setSelectedTab(tab.key)}
           >
             <Text style={[
-              styles.periodButtonText,
-              selectedPeriod === period.key && styles.periodButtonTextActive
+              styles.tabText,
+              selectedTab === tab.key && styles.tabTextActive
             ]}>
-              {period.label}
+              {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -377,33 +377,28 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 4,
   },
-  periodSelector: {
+  tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
     backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#333',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  periodButtonActive: {
-    backgroundColor: '#00D4FF',
-    borderColor: '#00D4FF',
+  tabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#00D4FF',
   },
-  periodButtonText: {
+  tabText: {
     color: '#888',
     fontSize: 14,
     fontWeight: '600',
   },
-  periodButtonTextActive: {
-    color: '#fff',
+  tabTextActive: {
+    color: '#00D4FF',
   },
   ratingSection: {
     padding: 20,
