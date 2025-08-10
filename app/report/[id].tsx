@@ -287,6 +287,12 @@ export default function ReportScreen() {
             <TouchableOpacity style={styles.headerAction}>
               <Share2 size={20} color="#00D4FF" />
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerAction}
+              onPress={() => router.push('/video-player')}
+            >
+              <Play size={20} color="#00D4FF" />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.headerAction}>
               <Download size={20} color="#00D4FF" />
             </TouchableOpacity>

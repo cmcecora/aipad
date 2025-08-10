@@ -88,7 +88,11 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Matches</Text>
         {recentMatches.map((match) => (
-          <TouchableOpacity key={match.id} style={styles.matchCard}>
+          <TouchableOpacity 
+            key={match.id} 
+            style={styles.matchCard}
+            onPress={() => router.push(`/report/${match.id}`)}
+          >
             <View style={styles.matchHeader}>
               <Text style={styles.matchDate}>{match.date}</Text>
               <View style={[styles.resultBadge, { backgroundColor: match.result === 'Win' ? '#00FF88' : '#FF6B6B' }]}>
