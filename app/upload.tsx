@@ -2,18 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { 
-  ArrowLeft, 
-  Upload, 
-  Video, 
-  CheckCircle, 
-  AlertCircle,
-  Play,
-  FileVideo,
-  Clock,
-  Users,
-  Target
-} from 'lucide-react-native';
+import { ArrowLeft, Upload, Video, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Play, FileVideo, Clock, Users, Target } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 
 export default function UploadScreen() {
