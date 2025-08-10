@@ -13,8 +13,8 @@ export default function RootLayout() {
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="calibration" options={{ headerShown: false }} />
         <Stack.Screen name="recording" options={{ headerShown: false }} />
+        <Stack.Screen name="record" options={{ headerShown: false }} />
         <Stack.Screen name="report/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="matches" options={{ headerShown: false }} />
         <Stack.Screen name="upload" options={{ headerShown: false }} />
         <Stack.Screen name="video-player" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />

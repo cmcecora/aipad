@@ -111,7 +111,7 @@ export default function HomeScreen() {
         
         <TouchableOpacity 
           style={styles.viewAllButton}
-          onPress={() => router.push('/matches')}
+          onPress={() => router.push('/(tabs)/matches')}
         >
           <Text style={styles.viewAllText}>View All Matches</Text>
           <Text style={styles.viewAllArrow}>→</Text>

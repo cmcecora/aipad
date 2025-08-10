@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Chrome as Home, ChartBar as BarChart3, Settings, Trophy, Video } from 'lucide-react-native';
+import { Home, FileText, BarChart3, Settings } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -32,11 +32,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="record"
+        name="matches"
         options={{
-          title: 'Record',
+          title: 'Matches',
           tabBarIcon: ({ size, color }) => (
-            <Video size={size} color={color} />
+            <FileText size={size} color={color} />
           ),
         }}
       />
@@ -46,15 +46,6 @@ export default function TabLayout() {
           title: 'Analytics',
           tabBarIcon: ({ size, color }) => (
             <BarChart3 size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="rankings"
-        options={{
-          title: 'Rankings',
-          tabBarIcon: ({ size, color }) => (
-            <Trophy size={size} color={color} />
           ),
         }}
       />
