@@ -154,9 +154,9 @@ export default function AnalyticsScreen() {
                     }
                   ]}
                 />
-                • Excellent backhand consistency (92% accuracy){'\n'}
-                • Strong net play with 87% volley success{'\n'}
-                • Effective court positioning throughout matches
+              </View>
+              <Text style={[styles.accuracyText, { color: getAccuracyColor(shot.accuracy) }]}>
+                {shot.accuracy}%
               </Text>
             </View>
           </View>
@@ -166,10 +166,19 @@ export default function AnalyticsScreen() {
       {/* Performance Insights */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Key Insights</Text>
-                • Shot accuracy improving 15% over last month{'\n'}
-                • Court coverage increased by 12%{'\n'}
-                • Winner-to-error ratio improved to 1.9:1{'\n'}
-                • Average rally length increased by 2.3 shots
+        
+        <View style={styles.insightCard}>
+          <Text style={styles.insightDescription}>
+            • Shot accuracy improving 15% over last month{'\n'}
+            • Court coverage increased by 12%{'\n'}
+            • Winner-to-error ratio improved to 1.9:1{'\n'}
+            • Average rally length increased by 2.3 shots{'\n'}
+            • Excellent backhand consistency (92% accuracy){'\n'}
+            • Strong net play with 87% volley success{'\n'}
+            • Effective court positioning throughout matches
+          </Text>
+        </View>
+
             <Text style={styles.insightTitle}>Strongest Area</Text>
           </View>
           <Text style={styles.insightValue}>Volleys at the Net</Text>
