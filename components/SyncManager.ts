@@ -46,7 +46,7 @@ export class SyncManager {
   private onError?: (error: string) => void;
   private onSessionUpdate?: (session: Partial<SyncSession>) => void;
 
-  constructor(serverUrl: string = 'ws://localhost:3001/sync') {
+  constructor(serverUrl: string = 'ws://localhost:3002/sync') {
     this.serverUrl = serverUrl;
   }
 

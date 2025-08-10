@@ -367,7 +367,7 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 server.listen(PORT, () => {
   console.log(`Sync server running on port ${PORT}`);
