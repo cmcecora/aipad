@@ -761,6 +761,45 @@ const styles = StyleSheet.create({
     color: '#888',
     lineHeight: 20,
   },
+  videoThumbnailCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  videoThumbnail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  videoPreview: {
+    width: 80,
+    height: 60,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  videoInfo: {
+    flex: 1,
+  },
+  videoTitle: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  videoDuration: {
+    fontSize: 14,
+    color: '#00D4FF',
+    marginBottom: 2,
+  },
+  videoSize: {
+    fontSize: 12,
+    color: '#888',
+  },
   breakdownCard: {
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
