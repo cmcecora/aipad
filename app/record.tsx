@@ -1,22 +1,76 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Smartphone, Wifi, Settings, Play, Users, MapPin, Upload, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
 
 export default function RecordScreen() {
   const [isConnected, setIsConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [cameraStatus, setCameraStatus] = useState({
     primary: 'disconnected',
     secondary: 'disconnected'
   });
+  const [camPerm, requestCamPerm] = useCameraPermissions();
+  const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  const cameraRef = React.useRef<CameraView>(null);
 
-  const handleStartRecording = () => {
-    if (!isConnected) {
-      Alert.alert('Setup Required', 'Please connect and calibrate both cameras before recording.');
+  const ensurePermissions = async (): Promise<boolean> => {
+    if (!camPerm?.granted) await requestCamPerm();
+    if (!micPerm?.granted) await requestMicPerm();
+    const mediaPerm = await MediaLibrary.requestPermissionsAsync();
+    return Boolean(camPerm?.granted && micPerm?.granted && mediaPerm.status === 'granted');
+  };
+
+  const handleStartRecording = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Camera Not Available', 'Camera recording is not available on web. Please use a mobile device.');
       return;
     }
-    router.push('/calibration');
+
+    if (!(await ensurePermissions())) {
+      Alert.alert('Permissions Required', 'Camera, microphone, and photo library permissions are needed for recording.');
+      return;
+    }
+
+    setShowCamera(true);
+    setIsRecording(true);
+    
+    try {
+      if (cameraRef.current) {
+        const recording = await cameraRef.current.recordAsync({ maxDuration: 3600 }); // up to 1h
+        if (!recording?.uri) throw new Error('No recording URI');
+
+        // Save to gallery by default, create Raydel album
+        const asset = await MediaLibrary.createAssetAsync(recording.uri);
+        await MediaLibrary.createAlbumAsync('Raydel Recordings', asset, false);
+
+        Alert.alert('Recording Saved', Platform.OS === 'android' ? 'Video saved to Gallery' : 'Saved to Photos');
+        
+        // Navigate to match report after successful recording
+        router.push('/report/1');
+      }
+    } catch (e) {
+      Alert.alert('Recording Error', e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setIsRecording(false);
+      setShowCamera(false);
+    }
+  };
+
+  const handleStopRecording = async () => {
+    try {
+      if (cameraRef.current) {
+        cameraRef.current.stopRecording();
+      }
+    } catch (error) {
+      console.log('Stop recording error:', error);
+    }
+    setIsRecording(false);
+    setShowCamera(false);
   };
 
   const handleCameraSetup = () => {
@@ -40,7 +94,26 @@ export default function RecordScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
+      {showCamera && Platform.OS !== 'web' ? (
+        <View style={styles.cameraContainer}>
+          <CameraView 
+            ref={cameraRef} 
+            style={styles.camera} 
+            facing="back" 
+            mode="video" 
+          />
+          <View style={styles.cameraOverlay}>
+            <TouchableOpacity 
+              style={styles.stopButton}
+              onPress={handleStopRecording}
+            >
+              <Text style={styles.stopButtonText}>Stop Recording</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollContainer}>
       {/* Header */}
       <LinearGradient
         colors={['#1a1a1a', '#2a2a2a']}
@@ -182,20 +255,24 @@ export default function RecordScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.primaryButton, !isConnected && styles.disabledButton]}
+          style={styles.primaryButton}
           onPress={handleStartRecording}
-          disabled={!isConnected}
+          disabled={isRecording}
         >
           <LinearGradient
-            colors={isConnected ? ['#00FF88', '#00CC6A'] : ['#333', '#333']}
+            colors={isRecording ? ['#333', '#333'] : ['#00FF88', '#00CC6A']}
             style={styles.primaryButtonGradient}
           >
             <Play size={20} color="#fff" />
-            <Text style={styles.primaryButtonText}>Start Recording</Text>
+            <Text style={styles.primaryButtonText}>
+              {isRecording ? 'Recording...' : 'Start Recording'}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -203,6 +280,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0a',
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  cameraContainer: {
+    flex: 1,
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    position: 'absolute',
+    bottom: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  stopButton: {
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  stopButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     paddingTop: 60,
