@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Smartphone, Wifi, Settings, Play, Users, MapPin } from 'lucide-react-native';
+import { Camera, Smartphone, Wifi, Settings, Play, Users, MapPin, Upload } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 export default function RecordScreen() {
@@ -158,6 +158,14 @@ export default function RecordScreen() {
       <View style={styles.actionButtons}>
         <TouchableOpacity 
           style={styles.secondaryButton}
+          onPress={() => router.push('/upload')}
+        >
+          <Upload size={20} color="#00D4FF" />
+          <Text style={styles.secondaryButtonText}>Upload Video</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.secondaryButton}
           onPress={handleCameraSetup}
         >
           <Camera size={20} color="#00D4FF" />
@@ -310,7 +318,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     padding: 20,
-    gap: 12,
+    gap: 8,
   },
   secondaryButton: {
     backgroundColor: '#1a1a1a',

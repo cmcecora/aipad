@@ -15,6 +15,8 @@ export default function RootLayout() {
         <Stack.Screen name="recording" options={{ headerShown: false }} />
         <Stack.Screen name="report/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="matches" options={{ headerShown: false }} />
+        <Stack.Screen name="upload" options={{ headerShown: false }} />
+        <Stack.Screen name="video-player" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
