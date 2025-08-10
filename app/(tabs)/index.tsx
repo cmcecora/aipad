@@ -59,6 +59,19 @@ export default function HomeScreen() {
       <View style={styles.quickActions}>
         <TouchableOpacity 
           style={styles.actionButton}
+          onPress={() => router.push('/record')}
+        >
+          <LinearGradient
+            colors={['#FF6B6B', '#FF4757']}
+            style={styles.actionGradient}
+          >
+            <Camera size={24} color="#fff" />
+            <Text style={styles.actionText}>Start Recording</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton}
           onPress={() => router.push('/analytics')}
         >
           <LinearGradient
@@ -202,9 +215,10 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: 20,
+    gap: 12,
   },
   actionButton: {
-    width: '100%',
+    flex: 1,
     borderRadius: 12,
     overflow: 'hidden',
   },
