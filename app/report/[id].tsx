@@ -41,7 +41,15 @@ export default function ReportScreen() {
     opponent: 'Carlos Martinez',
     ratingChange: +15,
     newRating: 1547,
-    previousRating: 1532
+    previousRating: 1532,
+    ratingBreakdown: {
+      technicalExecution: +8.2,
+      courtPositioning: +3.1,
+      shotConsistency: +2.8,
+      winnersImpact: +4.5,
+      matchOutcome: +2.1,
+      opponentDifferential: +1.3
+    }
   };
 
   const overviewStats = [
@@ -115,6 +123,78 @@ export default function ReportScreen() {
               </View>
             </View>
 
+            {/* Rating Breakdown */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Rating Factor Breakdown</Text>
+              
+              <View style={styles.breakdownCard}>
+                <Text style={styles.breakdownHeader}>Technical Factors (70%)</Text>
+                
+                <View style={styles.breakdownItem}>
+                  <View style={styles.breakdownLabel}>
+                    <Text style={styles.breakdownTitle}>Technical Execution</Text>
+                    <Text style={styles.breakdownWeight}>24.5%</Text>
+                  </View>
+                  <Text style={[styles.breakdownValue, { color: '#00D4FF' }]}>
+                    +{matchData.ratingBreakdown.technicalExecution.toFixed(1)}
+                  </Text>
+                </View>
+                
+                <View style={styles.breakdownItem}>
+                  <View style={styles.breakdownLabel}>
+                    <Text style={styles.breakdownTitle}>Court Positioning</Text>
+                    <Text style={styles.breakdownWeight}>17.5%</Text>
+                  </View>
+                  <Text style={[styles.breakdownValue, { color: '#00FF88' }]}>
+                    +{matchData.ratingBreakdown.courtPositioning.toFixed(1)}
+                  </Text>
+                </View>
+                
+                <View style={styles.breakdownItem}>
+                  <View style={styles.breakdownLabel}>
+                    <Text style={styles.breakdownTitle}>Shot Consistency</Text>
+                    <Text style={styles.breakdownWeight}>17.5%</Text>
+                  </View>
+                  <Text style={[styles.breakdownValue, { color: '#FFD700' }]}>
+                    +{matchData.ratingBreakdown.shotConsistency.toFixed(1)}
+                  </Text>
+                </View>
+                
+                <View style={styles.breakdownItem}>
+                  <View style={styles.breakdownLabel}>
+                    <Text style={styles.breakdownTitle}>Winners Impact</Text>
+                    <Text style={styles.breakdownWeight}>10.5%</Text>
+                  </View>
+                  <Text style={[styles.breakdownValue, { color: '#FF6B6B' }]}>
+                    +{matchData.ratingBreakdown.winnersImpact.toFixed(1)}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.breakdownCard}>
+                <Text style={styles.breakdownHeader}>Competitive Context (30%)</Text>
+                
+                <View style={styles.breakdownItem}>
+                  <View style={styles.breakdownLabel}>
+                    <Text style={styles.breakdownTitle}>Match Outcome</Text>
+                    <Text style={styles.breakdownWeight}>19.5%</Text>
+                  </View>
+                  <Text style={[styles.breakdownValue, { color: '#9D4EDD' }]}>
+                    +{matchData.ratingBreakdown.matchOutcome.toFixed(1)}
+                  </Text>
+                </View>
+                
+                <View style={styles.breakdownItem}>
+                  <View style={styles.breakdownLabel}>
+                    <Text style={styles.breakdownTitle}>Opponent Differential</Text>
+                    <Text style={styles.breakdownWeight}>10.5%</Text>
+                  </View>
+                  <Text style={[styles.breakdownValue, { color: '#FFA500' }]}>
+                    +{matchData.ratingBreakdown.opponentDifferential.toFixed(1)}
+                  </Text>
+                </View>
+              </View>
+            </View>
             {/* Overview Stats */}
             <View style={styles.statsGrid}>
               {overviewStats.map((stat, index) => (
@@ -680,5 +760,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     lineHeight: 20,
+  },
+  breakdownCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  breakdownHeader: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  breakdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  breakdownLabel: {
+    flex: 1,
+  },
+  breakdownTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  breakdownWeight: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  breakdownValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
