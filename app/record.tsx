@@ -356,6 +356,14 @@ export default function RecordScreen() {
       <View style={styles.actionButtons}>
         <TouchableOpacity 
           style={styles.secondaryButton}
+          onPress={() => router.push('/sync-recording')}
+        >
+          <Users size={20} color="#00D4FF" />
+          <Text style={styles.secondaryButtonText}>Sync Recording</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.secondaryButton}
           onPress={() => router.push('/upload')}
         >
           <Upload size={20} color="#00D4FF" />

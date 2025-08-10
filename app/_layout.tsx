@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="calibration" options={{ headerShown: false }} />
         <Stack.Screen name="recording" options={{ headerShown: false }} />
         <Stack.Screen name="record" options={{ headerShown: false }} />
+        <Stack.Screen name="sync-recording" options={{ headerShown: false }} />
         <Stack.Screen name="report/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="upload" options={{ headerShown: false }} />
         <Stack.Screen name="video-player" options={{ headerShown: false }} />
