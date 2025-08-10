@@ -113,6 +113,317 @@ export default function AnalyticsScreen() {
     return '#FF6B6B';
   };
 
+  const renderTabContent = () => {
+    switch (selectedTab) {
+      case 'overview':
+        return (
+          <View>
+            {/* Current Rating */}
+            <View style={styles.ratingSection}>
+              <View style={styles.ratingCard}>
+                <LinearGradient
+                  colors={['#00D4FF', '#0099CC']}
+                  style={styles.ratingGradient}
+                >
+                  <Text style={styles.ratingLabel}>Current Raydel Rating</Text>
+                  <Text style={styles.ratingValue}>{currentRating}</Text>
+                  <View style={styles.ratingChange}>
+                    <TrendingUp size={16} color="#00FF88" />
+                    <Text style={styles.ratingChangeText}>+47 this month</Text>
+                  </View>
+                  <Text style={styles.ratingLevel}>High Intermediate (4.0-4.5)</Text>
+                </LinearGradient>
+              </View>
+            </View>
+
+            {/* Technical Factors Section (70% Weight) */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Technical Factors</Text>
+                <View style={styles.weightBadge}>
+                  <Text style={styles.weightText}>70% Total Weight</Text>
+                </View>
+              </View>
+              
+              {technicalFactors.map((factor, index) => (
+                <View key={index} style={styles.factorCard}>
+                  <View style={styles.factorHeader}>
+                    <View style={styles.factorTitleRow}>
+                      <Text style={styles.factorTitle}>{factor.title}</Text>
+                      <View style={[styles.weightIndicator, { backgroundColor: factor.color }]}>
+                        <Text style={styles.weightIndicatorText}>{factor.weight}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.factorDescription}>{factor.description}</Text>
+                  </View>
+                  
+                  <View style={styles.factorMetrics}>
+                    <Text style={[styles.factorValue, { color: factor.color }]}>{factor.value}</Text>
+                    <Text style={[styles.factorChange, { color: '#00FF88' }]}>{factor.change}</Text>
+                  </View>
+                  
+                  <View style={styles.progressBar}>
+                    <View 
+                      style={[
+                        styles.progressFill,
+                        { 
+                          width: factor.value,
+                          backgroundColor: factor.color
+                        }
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Competitive Context Factors (30% Weight) */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Competitive Context</Text>
+                <View style={styles.weightBadge}>
+                  <Text style={styles.weightText}>30% Total Weight</Text>
+                </View>
+              </View>
+              
+              {competitiveFactors.map((factor, index) => (
+                <View key={index} style={styles.factorCard}>
+                  <View style={styles.factorHeader}>
+                    <View style={styles.factorTitleRow}>
+                      <Text style={styles.factorTitle}>{factor.title}</Text>
+                      <View style={[styles.weightIndicator, { backgroundColor: factor.color }]}>
+                        <Text style={styles.weightIndicatorText}>{factor.weight}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.factorDescription}>{factor.description}</Text>
+                  </View>
+                  
+                  <View style={styles.factorMetrics}>
+                    <Text style={[styles.factorValue, { color: factor.color }]}>{factor.value}</Text>
+                    <Text style={[styles.factorChange, { color: '#00FF88' }]}>{factor.change}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+
+      case 'shots':
+        return (
+          <View>
+            {/* Shot Quality Breakdown */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Shot Quality Distribution</Text>
+              {shotBreakdown.map((shot, index) => (
+                <View key={index} style={styles.shotCard}>
+                  <View style={styles.shotHeader}>
+                    <Text style={styles.shotType}>{shot.type}</Text>
+                    <View style={styles.shotMetrics}>
+                      <Text style={styles.shotCount}>{shot.count} shots</Text>
+                      <Text style={[styles.shotPoints, { color: shot.color }]}>{shot.points} pts</Text>
+                    </View>
+                  </View>
+                  <View style={styles.shotProgress}>
+                    <View style={styles.shotProgressBar}>
+                      <View 
+                        style={[
+                          styles.shotProgressFill,
+                          { 
+                            width: `${shot.percentage}%`,
+                            backgroundColor: shot.color
+                          }
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.shotPercentage}>{shot.percentage}%</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Shot Type Analysis */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Shot Type Breakdown</Text>
+              {[
+                { type: 'Forehands', count: 142, winners: 18, errors: 8, accuracy: 94, color: '#00D4FF' },
+                { type: 'Backhands', count: 98, winners: 12, errors: 6, accuracy: 92, color: '#00FF88' },
+                { type: 'Volleys', count: 23, winners: 3, errors: 2, accuracy: 87, color: '#FFD700' },
+                { type: 'Smashes', count: 14, winners: 1, errors: 1, accuracy: 86, color: '#FF6B6B' },
+                { type: 'Serves', count: 10, winners: 0, errors: 1, accuracy: 90, color: '#9D4EDD' }
+              ].map((shot, index) => (
+                <View key={index} style={styles.shotTypeCard}>
+                  <View style={styles.shotTypeHeader}>
+                    <Text style={styles.shotTypeName}>{shot.type}</Text>
+                    <Text style={styles.shotTypeCount}>{shot.count} shots</Text>
+                  </View>
+                  <View style={styles.shotTypeStats}>
+                    <View style={styles.shotTypeStat}>
+                      <Text style={styles.shotTypeStatValue}>{shot.winners}</Text>
+                      <Text style={styles.shotTypeStatLabel}>Winners</Text>
+                    </View>
+                    <View style={styles.shotTypeStat}>
+                      <Text style={styles.shotTypeStatValue}>{shot.errors}</Text>
+                      <Text style={styles.shotTypeStatLabel}>Errors</Text>
+                    </View>
+                    <View style={styles.shotTypeStat}>
+                      <Text style={[styles.shotTypeStatValue, { color: shot.color }]}>
+                        {shot.accuracy}%
+                      </Text>
+                      <Text style={styles.shotTypeStatLabel}>Accuracy</Text>
+                    </View>
+                  </View>
+                  <View style={styles.accuracyBar}>
+                    <View 
+                      style={[
+                        styles.accuracyFill,
+                        { 
+                          width: `${shot.accuracy}%`,
+                          backgroundColor: shot.color
+                        }
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+
+      case 'movement':
+        return (
+          <View>
+            {/* Court Movement Analysis */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Court Positioning Analysis</Text>
+              <View style={styles.heatmapCard}>
+                <View style={styles.heatmapContainer}>
+                  <Text style={styles.heatmapTitle}>Court Coverage Heatmap</Text>
+                  <View style={styles.heatmapPlaceholder}>
+                    <Text style={styles.heatmapText}>Movement heatmap visualization</Text>
+                  </View>
+                </View>
+              </View>
+              
+              <View style={styles.movementStats}>
+                <View style={styles.movementStat}>
+                  <Text style={styles.movementValue}>85%</Text>
+                  <Text style={styles.movementLabel}>Court Coverage</Text>
+                </View>
+                <View style={styles.movementStat}>
+                  <Text style={styles.movementValue}>78%</Text>
+                  <Text style={styles.movementLabel}>Strategic Movement</Text>
+                </View>
+                <View style={styles.movementStat}>
+                  <Text style={styles.movementValue}>82%</Text>
+                  <Text style={styles.movementLabel}>Recovery Efficiency</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Position Score Breakdown */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Position Score Components</Text>
+              <View style={styles.positionBreakdown}>
+                <View style={styles.positionComponent}>
+                  <Text style={styles.positionTitle}>Court Coverage</Text>
+                  <Text style={styles.positionWeight}>40% of Position Score</Text>
+                  <Text style={styles.positionValue}>85%</Text>
+                </View>
+                <View style={styles.positionComponent}>
+                  <Text style={styles.positionTitle}>Strategic Movement</Text>
+                  <Text style={styles.positionWeight}>30% of Position Score</Text>
+                  <Text style={styles.positionValue}>78%</Text>
+                </View>
+                <View style={styles.positionComponent}>
+                  <Text style={styles.positionTitle}>Recovery Efficiency</Text>
+                  <Text style={styles.positionWeight}>30% of Position Score</Text>
+                  <Text style={styles.positionValue}>82%</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        );
+
+      case 'analysis':
+        return (
+          <View>
+            {/* AI-Powered Insights */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>AI-Powered Insights</Text>
+              
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <Award size={20} color="#00FF88" />
+                  <Text style={styles.insightTitle}>Strongest Technical Factor</Text>
+                </View>
+                <Text style={styles.insightValue}>Winners Impact (91%)</Text>
+                <Text style={styles.insightDescription}>
+                  Exceptional performance in decisive moments. Your ability to execute winners under pressure is elite-level.
+                </Text>
+              </View>
+
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <Target size={20} color="#FFD700" />
+                  <Text style={styles.insightTitle}>Primary Improvement Area</Text>
+                </View>
+                <Text style={styles.insightValue}>Shot Consistency (79%)</Text>
+                <Text style={styles.insightDescription}>
+                  Focus on reducing unforced errors and maintaining rally length. 13% improvement potential to reach target.
+                </Text>
+              </View>
+
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <TrendingUp size={20} color="#00D4FF" />
+                  <Text style={styles.insightTitle}>Rating Projection</Text>
+                </View>
+                <Text style={styles.insightValue}>1620 by Month End</Text>
+                <Text style={styles.insightDescription}>
+                  Current trajectory suggests advancement to Advanced level (5.0) within 4-6 weeks with consistent performance.
+                </Text>
+              </View>
+
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
+                  <Shield size={20} color="#9D4EDD" />
+                  <Text style={styles.insightTitle}>Competitive Edge</Text>
+                </View>
+                <Text style={styles.insightValue}>+127 vs Opponents</Text>
+                <Text style={styles.insightDescription}>
+                  Strong performance against higher-rated players. Your rating gains are accelerated by quality of opposition.
+                </Text>
+              </View>
+            </View>
+
+            {/* Detailed Performance Metrics */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Performance Metrics</Text>
+              <View style={styles.metricsGrid}>
+                {performanceMetrics.map((metric, index) => (
+                  <View key={index} style={styles.metricCard}>
+                    <Text style={styles.metricTitle}>{metric.metric}</Text>
+                    <View style={styles.metricValues}>
+                      <Text style={[styles.metricCurrent, { color: getMetricColor(metric.value, metric.target) }]}>
+                        {metric.value}
+                      </Text>
+                      <Text style={styles.metricUnit}>{metric.unit}</Text>
+                    </View>
+                    <View style={styles.metricTarget}>
+                      <Text style={styles.metricTargetLabel}>Target: {metric.target}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
@@ -145,213 +456,9 @@ export default function AnalyticsScreen() {
         ))}
       </View>
 
-      {/* Current Rating */}
-      <View style={styles.ratingSection}>
-        <View style={styles.ratingCard}>
-          <LinearGradient
-            colors={['#00D4FF', '#0099CC']}
-            style={styles.ratingGradient}
-          >
-            <Text style={styles.ratingLabel}>Current Raydel Rating</Text>
-            <Text style={styles.ratingValue}>{currentRating}</Text>
-            <View style={styles.ratingChange}>
-              <TrendingUp size={16} color="#00FF88" />
-              <Text style={styles.ratingChangeText}>+47 this month</Text>
-            </View>
-            <Text style={styles.ratingLevel}>High Intermediate (4.0-4.5)</Text>
-          </LinearGradient>
-        </View>
-      </View>
-
-      {/* Technical Factors Section (70% Weight) */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Technical Factors</Text>
-          <View style={styles.weightBadge}>
-            <Text style={styles.weightText}>70% Total Weight</Text>
-          </View>
-        </View>
-        
-        {technicalFactors.map((factor, index) => (
-          <View key={index} style={styles.factorCard}>
-            <View style={styles.factorHeader}>
-              <View style={styles.factorTitleRow}>
-                <Text style={styles.factorTitle}>{factor.title}</Text>
-                <View style={[styles.weightIndicator, { backgroundColor: factor.color }]}>
-                  <Text style={styles.weightIndicatorText}>{factor.weight}</Text>
-                </View>
-              </View>
-              <Text style={styles.factorDescription}>{factor.description}</Text>
-            </View>
-            
-            <View style={styles.factorMetrics}>
-              <Text style={[styles.factorValue, { color: factor.color }]}>{factor.value}</Text>
-              <Text style={[styles.factorChange, { color: '#00FF88' }]}>{factor.change}</Text>
-            </View>
-            
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill,
-                  { 
-                    width: factor.value,
-                    backgroundColor: factor.color
-                  }
-                ]}
-              />
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Competitive Context Factors (30% Weight) */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Competitive Context</Text>
-          <View style={styles.weightBadge}>
-            <Text style={styles.weightText}>30% Total Weight</Text>
-          </View>
-        </View>
-        
-        {competitiveFactors.map((factor, index) => (
-          <View key={index} style={styles.factorCard}>
-            <View style={styles.factorHeader}>
-              <View style={styles.factorTitleRow}>
-                <Text style={styles.factorTitle}>{factor.title}</Text>
-                <View style={[styles.weightIndicator, { backgroundColor: factor.color }]}>
-                  <Text style={styles.weightIndicatorText}>{factor.weight}</Text>
-                </View>
-              </View>
-              <Text style={styles.factorDescription}>{factor.description}</Text>
-            </View>
-            
-            <View style={styles.factorMetrics}>
-              <Text style={[styles.factorValue, { color: factor.color }]}>{factor.value}</Text>
-              <Text style={[styles.factorChange, { color: '#00FF88' }]}>{factor.change}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Shot Quality Breakdown */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Shot Quality Distribution</Text>
-        {shotBreakdown.map((shot, index) => (
-          <View key={index} style={styles.shotCard}>
-            <View style={styles.shotHeader}>
-              <Text style={styles.shotType}>{shot.type}</Text>
-              <View style={styles.shotMetrics}>
-                <Text style={styles.shotCount}>{shot.count} shots</Text>
-                <Text style={[styles.shotPoints, { color: shot.color }]}>{shot.points} pts</Text>
-              </View>
-            </View>
-            <View style={styles.shotProgress}>
-              <View style={styles.shotProgressBar}>
-                <View 
-                  style={[
-                    styles.shotProgressFill,
-                    { 
-                      width: `${shot.percentage}%`,
-                      backgroundColor: shot.color
-                    }
-                  ]}
-                />
-              </View>
-              <Text style={styles.shotPercentage}>{shot.percentage}%</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Detailed Performance Metrics */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Performance Metrics</Text>
-        <View style={styles.metricsGrid}>
-          {performanceMetrics.map((metric, index) => (
-            <View key={index} style={styles.metricCard}>
-              <Text style={styles.metricTitle}>{metric.metric}</Text>
-              <View style={styles.metricValues}>
-                <Text style={[styles.metricCurrent, { color: getMetricColor(metric.value, metric.target) }]}>
-                  {metric.value}
-                </Text>
-                <Text style={styles.metricUnit}>{metric.unit}</Text>
-              </View>
-              <View style={styles.metricTarget}>
-                <Text style={styles.metricTargetLabel}>Target: {metric.target}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Rating Evolution Chart */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Rating Evolution</Text>
-        <View style={styles.chartCard}>
-          <View style={styles.chartPlaceholder}>
-            <View style={styles.chartLine}>
-              {ratingHistory.map((point, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.chartPoint,
-                    { backgroundColor: getRatingColor(point.rating) }
-                  ]}
-                />
-              ))}
-            </View>
-            <Text style={styles.chartLabel}>Rating progression over time</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Key Insights */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>AI-Powered Insights</Text>
-        
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}>
-            <Award size={20} color="#00FF88" />
-            <Text style={styles.insightTitle}>Strongest Technical Factor</Text>
-          </View>
-          <Text style={styles.insightValue}>Winners Impact (91%)</Text>
-          <Text style={styles.insightDescription}>
-            Exceptional performance in decisive moments. Your ability to execute winners under pressure is elite-level.
-          </Text>
-        </View>
-
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}>
-            <Target size={20} color="#FFD700" />
-            <Text style={styles.insightTitle}>Primary Improvement Area</Text>
-          </View>
-          <Text style={styles.insightValue}>Shot Consistency (79%)</Text>
-          <Text style={styles.insightDescription}>
-            Focus on reducing unforced errors and maintaining rally length. 13% improvement potential to reach target.
-          </Text>
-        </View>
-
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}>
-            <TrendingUp size={20} color="#00D4FF" />
-            <Text style={styles.insightTitle}>Rating Projection</Text>
-          </View>
-          <Text style={styles.insightValue}>1620 by Month End</Text>
-          <Text style={styles.insightDescription}>
-            Current trajectory suggests advancement to Advanced level (5.0) within 4-6 weeks with consistent performance.
-          </Text>
-        </View>
-
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}>
-            <Shield size={20} color="#9D4EDD" />
-            <Text style={styles.insightTitle}>Competitive Edge</Text>
-          </View>
-          <Text style={styles.insightValue}>+127 vs Opponents</Text>
-          <Text style={styles.insightDescription}>
-            Strong performance against higher-rated players. Your rating gains are accelerated by quality of opposition.
-          </Text>
-        </View>
+      {/* Content */}
+      <View style={styles.content}>
+        {renderTabContent()}
       </View>
     </ScrollView>
   );
@@ -674,5 +781,136 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 14,
     lineHeight: 20,
+  },
+  content: {
+    flex: 1,
+  },
+  shotTypeCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  shotTypeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  shotTypeName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  shotTypeCount: {
+    color: '#888',
+    fontSize: 14,
+  },
+  shotTypeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  shotTypeStat: {
+    alignItems: 'center',
+  },
+  shotTypeStatValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  shotTypeStatLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  accuracyBar: {
+    height: 6,
+    backgroundColor: '#333',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  accuracyFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  heatmapCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  heatmapContainer: {
+    alignItems: 'center',
+  },
+  heatmapTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  heatmapPlaceholder: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heatmapText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  movementStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  movementStat: {
+    alignItems: 'center',
+  },
+  movementValue: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  movementLabel: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  positionBreakdown: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  positionComponent: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  positionTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  positionWeight: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  positionValue: {
+    color: '#00D4FF',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });
