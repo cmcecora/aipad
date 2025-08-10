@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Smartphone, Wifi, Settings, Play, Users, MapPin, Upload, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -232,7 +232,7 @@ export default function RecordScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#1a1a1a', '#2a2a2a']}
@@ -386,7 +386,7 @@ export default function RecordScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
