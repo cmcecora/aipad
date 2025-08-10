@@ -56,6 +56,14 @@ export default function VideoPlayerScreen() {
     setCurrentTime(newTime);
   };
 
+  const handleOverlayToggle = (overlayType: string) => {
+    setSelectedOverlay(overlayType);
+    if (overlayType === 'none') {
+      setShowOverlays(false);
+    } else {
+      setShowOverlays(true);
+    }
+  };
   return (
     <View style={styles.container}>
       {/* Header */}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, Bell, Shield, CreditCard, CircleHelp as HelpCircle, LogOut, ChevronRight, Crown, Camera, Wifi, Database } from 'lucide-react-native';
+import { User, Bell, Shield, CreditCard, CircleHelp as HelpCircle, LogOut, ChevronRight, Crown, Camera, Wifi, Database, Target } from 'lucide-react-native';
 
 export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
@@ -140,6 +140,19 @@ export default function SettingsScreen() {
           />
         </View>
 
+        <View style={styles.settingItem}>
+          <Target size={20} color="#00D4FF" />
+          <View style={styles.settingContent}>
+            <Text style={styles.settingTitle}>AI Processing Level</Text>
+            <Text style={styles.settingSubtitle}>Advanced analysis uses more battery</Text>
+          </View>
+          <Switch
+            value={true}
+            onValueChange={() => {}}
+            trackColor={{ false: '#333', true: '#00D4FF' }}
+            thumbColor={'#fff'}
+          />
+        </View>
         <View style={styles.settingItem}>
           <Wifi size={20} color="#00D4FF" />
           <View style={styles.settingContent}>

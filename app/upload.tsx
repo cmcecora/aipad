@@ -72,7 +72,7 @@ export default function UploadScreen() {
       } else {
         clearInterval(stageInterval);
         setIsProcessing(false);
-        router.push('/report/uploaded-match');
+        router.push('/report/1');
       }
     }, 2000);
   };

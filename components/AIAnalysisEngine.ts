@@ -73,16 +73,16 @@ export class AIAnalysisEngine {
     try {
       // In a real implementation, these would load actual TensorFlow.js models
       console.log('Loading player detection model...');
-      // this.models.playerDetection = await tf.loadLayersModel('/models/player-detection.json');
+      // this.models.playerDetection = await tf.loadLayersModel('/assets/models/player-detection.json');
       
       console.log('Loading ball tracking model...');
-      // this.models.ballTracking = await tf.loadLayersModel('/models/ball-tracking.json');
+      // this.models.ballTracking = await tf.loadLayersModel('/assets/models/ball-tracking.json');
       
       console.log('Loading shot classification model...');
-      // this.models.shotClassification = await tf.loadLayersModel('/models/shot-classification.json');
+      // this.models.shotClassification = await tf.loadLayersModel('/assets/models/shot-classification.json');
       
       console.log('Loading court detection model...');
-      // this.models.courtDetection = await tf.loadLayersModel('/models/court-detection.json');
+      // this.models.courtDetection = await tf.loadLayersModel('/assets/models/court-detection.json');
 
       this.isInitialized = true;
       console.log('AI Analysis Engine initialized successfully');
