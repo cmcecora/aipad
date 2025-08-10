@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Smartphone, Wifi, Settings, Play, Users, MapPin, Upload, ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
@@ -7,55 +7,106 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import * as MediaLibrary from 'expo-media-library';
 
 export default function RecordScreen() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
-  const [cameraStatus, setCameraStatus] = useState({
-    primary: 'disconnected',
-    secondary: 'disconnected'
-  });
+  const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
-  const cameraRef = React.useRef<CameraView>(null);
+  const [mediaLibraryPerm, requestMediaLibraryPerm] = MediaLibrary.usePermissions();
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const ensurePermissions = async (): Promise<boolean> => {
-    if (!camPerm?.granted) await requestCamPerm();
-    if (!micPerm?.granted) await requestMicPerm();
-    const mediaPerm = await MediaLibrary.requestPermissionsAsync();
-    return Boolean(camPerm?.granted && micPerm?.granted && mediaPerm.status === 'granted');
+    try {
+      // Request camera permission
+      if (!camPerm?.granted) {
+        const camResult = await requestCamPerm();
+        if (!camResult.granted) {
+          Alert.alert(
+            'Camera Permission Required',
+            'Please enable camera access in your device settings to record videos.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      }
+
+      // Request microphone permission
+      if (!micPerm?.granted) {
+        const micResult = await requestMicPerm();
+        if (!micResult.granted) {
+          Alert.alert(
+            'Microphone Permission Required',
+            'Please enable microphone access in your device settings to record audio.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      }
+
+      // Request media library permission
+      if (!mediaLibraryPerm?.granted) {
+        const mediaResult = await requestMediaLibraryPerm();
+        if (!mediaResult.granted) {
+          Alert.alert(
+            'Storage Permission Required',
+            'Please enable storage access to save recorded videos.',
+            [{ text: 'OK' }]
+          );
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Permission request error:', error);
+      Alert.alert('Permission Error', 'Failed to request permissions. Please try again.');
+      return false;
+    }
   };
 
   const handleStartRecording = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert('Camera Not Available', 'Camera recording is not available on web. Please use a mobile device.');
+      Alert.alert(
+        'Camera Not Available',
+        'Camera recording is not available on web. Please use a mobile device.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
-    if (!(await ensurePermissions())) {
-      Alert.alert('Permissions Required', 'Camera, microphone, and photo library permissions are needed for recording.');
-      return;
-    }
-
-    setShowCamera(true);
-    setIsRecording(true);
-    
     try {
-      if (cameraRef.current) {
-        const recording = await cameraRef.current.recordAsync({ maxDuration: 3600 }); // up to 1h
-        if (!recording?.uri) throw new Error('No recording URI');
+      const hasPermissions = await ensurePermissions();
+      if (!hasPermissions) return;
 
-        // Save to gallery by default, create Raydel album
-        const asset = await MediaLibrary.createAssetAsync(recording.uri);
-        await MediaLibrary.createAlbumAsync('Raydel Recordings', asset, false);
+      setShowCamera(true);
+      setIsRecording(true);
 
-        Alert.alert('Recording Saved', Platform.OS === 'android' ? 'Video saved to Gallery' : 'Saved to Photos');
-        
-        // Navigate to match report after successful recording
-        router.push('/report/1');
-      }
-    } catch (e) {
-      Alert.alert('Recording Error', e instanceof Error ? e.message : 'Unknown error');
-    } finally {
+      // Small delay to ensure camera is ready
+      setTimeout(async () => {
+        if (cameraRef.current) {
+          try {
+            const recording = await cameraRef.current.recordAsync({
+              maxDuration: 3600, // 1 hour max
+              quality: '1080p',
+              mute: false,
+            });
+
+            if (recording?.uri) {
+              await handleRecordingComplete(recording.uri);
+            }
+          } catch (recordError) {
+            console.error('Recording error:', recordError);
+            Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
+            setIsRecording(false);
+            setShowCamera(false);
+          }
+        }
+      }, 500);
+
+    } catch (error) {
+      console.error('Start recording error:', error);
+      Alert.alert('Error', 'Failed to start recording. Please try again.');
       setIsRecording(false);
       setShowCamera(false);
     }
@@ -63,57 +114,125 @@ export default function RecordScreen() {
 
   const handleStopRecording = async () => {
     try {
-      if (cameraRef.current) {
+      if (cameraRef.current && isRecording) {
         cameraRef.current.stopRecording();
       }
     } catch (error) {
-      console.log('Stop recording error:', error);
+      console.error('Stop recording error:', error);
+      Alert.alert('Error', 'Failed to stop recording properly.');
     }
-    setIsRecording(false);
-    setShowCamera(false);
+  };
+
+  const handleRecordingComplete = async (videoUri: string) => {
+    try {
+      setIsProcessing(true);
+      
+      // Create asset from the recorded video
+      const asset = await MediaLibrary.createAssetAsync(videoUri);
+      
+      // Create or get the Raydel Recordings album
+      let album = await MediaLibrary.getAlbumAsync('Raydel Recordings');
+      if (!album) {
+        album = await MediaLibrary.createAlbumAsync('Raydel Recordings', asset, false);
+      } else {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      }
+
+      // Show success message
+      Alert.alert(
+        'Recording Saved',
+        `Video saved successfully to ${Platform.OS === 'ios' ? 'Photos' : 'Gallery'} in "Raydel Recordings" album.`,
+        [
+          {
+            text: 'View Report',
+            onPress: () => router.push('/report/1')
+          },
+          {
+            text: 'Record Another',
+            onPress: () => {
+              setIsRecording(false);
+              setShowCamera(false);
+              setIsProcessing(false);
+            }
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('Save recording error:', error);
+      Alert.alert(
+        'Save Error',
+        'Recording completed but failed to save to gallery. The video may still be available in your camera roll.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsRecording(false);
+      setShowCamera(false);
+      setIsProcessing(false);
+    }
   };
 
   const handleCameraSetup = () => {
     router.push('/calibration');
   };
 
-  const getCameraStatusColor = (status: string) => {
-    switch (status) {
-      case 'connected': return '#00FF88';
-      case 'connecting': return '#FFD700';
-      default: return '#FF6B6B';
-    }
-  };
+  if (showCamera && Platform.OS !== 'web') {
+    return (
+      <View style={styles.cameraContainer}>
+        <CameraView 
+          ref={cameraRef} 
+          style={styles.camera} 
+          facing="back" 
+          mode="video"
+          onRecordingStatusChange={(status) => {
+            if (!status.isRecording && isRecording) {
+              // Recording stopped
+              setIsRecording(false);
+            }
+          }}
+        />
+        
+        <View style={styles.cameraOverlay}>
+          {/* Recording indicator */}
+          <View style={styles.recordingIndicator}>
+            <View style={[styles.recordingDot, { backgroundColor: isRecording ? '#FF0000' : '#666' }]} />
+            <Text style={styles.recordingText}>
+              {isProcessing ? 'PROCESSING...' : (isRecording ? 'RECORDING' : 'STOPPED')}
+            </Text>
+          </View>
 
-  const getCameraStatusText = (status: string) => {
-    switch (status) {
-      case 'connected': return 'Connected';
-      case 'connecting': return 'Connecting...';
-      default: return 'Disconnected';
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      {showCamera && Platform.OS !== 'web' ? (
-        <View style={styles.cameraContainer}>
-          <CameraView 
-            ref={cameraRef} 
-            style={styles.camera} 
-            facing="back" 
-            mode="video" 
-          />
-          <View style={styles.cameraOverlay}>
+          {/* Control buttons */}
+          <View style={styles.cameraControls}>
             <TouchableOpacity 
-              style={styles.stopButton}
-              onPress={handleStopRecording}
+              style={styles.backButton}
+              onPress={() => {
+                if (isRecording) {
+                  handleStopRecording();
+                } else {
+                  setShowCamera(false);
+                }
+              }}
             >
-              <Text style={styles.stopButtonText}>Stop Recording</Text>
+              <ArrowLeft size={24} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.stopButton, isProcessing && styles.disabledButton]}
+              onPress={handleStopRecording}
+              disabled={!isRecording || isProcessing}
+            >
+              <Text style={styles.stopButtonText}>
+                {isProcessing ? 'Processing...' : 'Stop Recording'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
-      ) : (
-        <ScrollView style={styles.scrollContainer}>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#1a1a1a', '#2a2a2a']}
@@ -121,7 +240,7 @@ export default function RecordScreen() {
       >
         <View style={styles.headerContent}>
           <TouchableOpacity 
-            style={styles.backButton}
+            style={styles.headerBackButton}
             onPress={() => router.back()}
           >
             <ArrowLeft size={24} color="#fff" />
@@ -140,23 +259,23 @@ export default function RecordScreen() {
           <View style={styles.cameraHeader}>
             <Smartphone size={24} color="#00D4FF" />
             <Text style={styles.cameraTitle}>Primary Camera</Text>
-            <View style={[styles.statusDot, { backgroundColor: getCameraStatusColor(cameraStatus.primary) }]} />
+            <View style={[styles.statusDot, { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]} />
           </View>
           <Text style={styles.cameraDescription}>Mount on back wall (Player 1 side)</Text>
-          <Text style={[styles.cameraStatus, { color: getCameraStatusColor(cameraStatus.primary) }]}>
-            {getCameraStatusText(cameraStatus.primary)}
+          <Text style={[styles.cameraStatus, { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]}>
+            {camPerm?.granted ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
 
         <View style={styles.cameraCard}>
           <View style={styles.cameraHeader}>
             <Smartphone size={24} color="#00D4FF" />
-            <Text style={styles.cameraTitle}>Secondary Camera</Text>
-            <View style={[styles.statusDot, { backgroundColor: getCameraStatusColor(cameraStatus.secondary) }]} />
+            <Text style={styles.cameraTitle}>Audio Recording</Text>
+            <View style={[styles.statusDot, { backgroundColor: micPerm?.granted ? '#00FF88' : '#FF6B6B' }]} />
           </View>
-          <Text style={styles.cameraDescription}>Mount on opposite back wall (Player 2 side)</Text>
-          <Text style={[styles.cameraStatus, { color: getCameraStatusColor(cameraStatus.secondary) }]}>
-            {getCameraStatusText(cameraStatus.secondary)}
+          <Text style={styles.cameraDescription}>High-quality audio capture</Text>
+          <Text style={[styles.cameraStatus, { color: micPerm?.granted ? '#00FF88' : '#FF6B6B' }]}>
+            {micPerm?.granted ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
       </View>
@@ -171,10 +290,9 @@ export default function RecordScreen() {
               <Text style={styles.stepText}>1</Text>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Position Cameras</Text>
+              <Text style={styles.stepTitle}>Grant Permissions</Text>
               <Text style={styles.stepDescription}>
-                Mount both phones on opposite back walls at shoulder height, 
-                ensuring clear view of the entire court
+                Allow camera, microphone, and storage access for recording
               </Text>
             </View>
           </View>
@@ -184,10 +302,9 @@ export default function RecordScreen() {
               <Text style={styles.stepText}>2</Text>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Connect Devices</Text>
+              <Text style={styles.stepTitle}>Position Camera</Text>
               <Text style={styles.stepDescription}>
-                Both phones must be connected to the same Wi-Fi network 
-                for real-time synchronization
+                Mount phone on back wall ensuring clear view of entire court
               </Text>
             </View>
           </View>
@@ -197,10 +314,9 @@ export default function RecordScreen() {
               <Text style={styles.stepText}>3</Text>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Calibrate Cameras</Text>
+              <Text style={styles.stepTitle}>Start Recording</Text>
               <Text style={styles.stepDescription}>
-                Use the calibration tool to align both cameras and 
-                create a unified court map
+                Tap the record button to begin capturing your match
               </Text>
             </View>
           </View>
@@ -230,8 +346,8 @@ export default function RecordScreen() {
         <TouchableOpacity style={styles.settingCard}>
           <Settings size={20} color="#00D4FF" />
           <View style={styles.settingContent}>
-            <Text style={styles.settingTitle}>Analysis Level</Text>
-            <Text style={styles.settingValue}>Professional</Text>
+            <Text style={styles.settingTitle}>Quality</Text>
+            <Text style={styles.settingValue}>1080p HD</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -255,23 +371,21 @@ export default function RecordScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.primaryButton}
+          style={[styles.primaryButton, (isRecording || isProcessing) && styles.disabledButton]}
           onPress={handleStartRecording}
-          disabled={isRecording}
+          disabled={isRecording || isProcessing}
         >
           <LinearGradient
-            colors={isRecording ? ['#333', '#333'] : ['#00FF88', '#00CC6A']}
+            colors={isRecording || isProcessing ? ['#333', '#333'] : ['#00FF88', '#00CC6A']}
             style={styles.primaryButtonGradient}
           >
             <Play size={20} color="#fff" />
             <Text style={styles.primaryButtonText}>
-              {isRecording ? 'Recording...' : 'Start Recording'}
+              {isProcessing ? 'Processing...' : (isRecording ? 'Recording...' : 'Start Recording')}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
-        </ScrollView>
-      )}
     </View>
   );
 }
@@ -281,32 +395,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0a',
   },
-  scrollContainer: {
-    flex: 1,
-  },
   cameraContainer: {
     flex: 1,
+    backgroundColor: '#000',
   },
   camera: {
     flex: 1,
   },
   cameraOverlay: {
     position: 'absolute',
-    bottom: 50,
+    top: 0,
     left: 0,
     right: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginTop: 60,
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  recordingText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  cameraControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  backButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 12,
+    borderRadius: 25,
   },
   stopButton: {
     backgroundColor: '#FF6B6B',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 24,
+    borderRadius: 25,
   },
   stopButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   header: {
     paddingTop: 60,
@@ -319,7 +468,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  backButton: {
+  headerBackButton: {
     padding: 8,
   },
   headerTitle: {
@@ -464,9 +613,6 @@ const styles = StyleSheet.create({
   primaryButton: {
     borderRadius: 12,
     overflow: 'hidden',
-  },
-  disabledButton: {
-    opacity: 0.5,
   },
   primaryButtonGradient: {
     padding: 16,
