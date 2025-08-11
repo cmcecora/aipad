@@ -15,21 +15,25 @@ Real-time synchronization server for dual-camera recording in the Raydel Padel A
 ## Installation
 
 1. Navigate to the server directory:
+
 ```bash
 cd server
 ```
 
 2. Install dependencies:
+
 ```bash
 npm install
 ```
 
 3. Start the server:
+
 ```bash
 npm start
 ```
 
 For development with auto-restart:
+
 ```bash
 npm run dev
 ```
@@ -45,10 +49,12 @@ PORT=8080 npm start
 ## API Endpoints
 
 ### WebSocket
+
 - **Endpoint**: `ws://localhost:3001/sync`
 - **Purpose**: Real-time communication between devices
 
 ### REST API
+
 - **GET /health** - Server health check
 - **GET /api/sessions** - List all active sessions
 - **GET /api/sessions/:sessionId** - Get specific session details
@@ -59,6 +65,7 @@ PORT=8080 npm start
 ### Client to Server
 
 #### Join Session
+
 ```json
 {
   "type": "join",
@@ -68,7 +75,8 @@ PORT=8080 npm start
 }
 ```
 
-#### Start Recording
+#### Start Recording (Client → Server)
+
 ```json
 {
   "type": "start_recording",
@@ -77,6 +85,7 @@ PORT=8080 npm start
 ```
 
 #### Stop Recording
+
 ```json
 {
   "type": "stop_recording",
@@ -87,6 +96,7 @@ PORT=8080 npm start
 ### Server to Client
 
 #### Device Connected
+
 ```json
 {
   "type": "device_connected",
@@ -96,17 +106,59 @@ PORT=8080 npm start
 }
 ```
 
-#### Start Recording Command
+#### Start Recording Command (Server → Clients)
+
 ```json
 {
   "type": "start_recording",
   "sessionId": "ABC123",
-  "timestamp": 1640995200000,
+  "atomic_start_time": 1640995201500,
+  "buffer_time_ms": 1500,
+  "server_now": 1640995200000,
   "initiator": "dev123"
 }
 ```
 
+The server schedules a start slightly in the future and broadcasts an atomic timestamp to all devices, including the initiator. Each client should estimate server time using the time sync messages below and schedule its local start accordingly.
+
+#### Time Sync Request (Server → Client)
+
+```json
+{
+  "type": "time_sync_request",
+  "request_id": "ABC123-1",
+  "server_timestamp": 1640995200000
+}
+```
+
+#### Time Sync Response (Client → Server)
+
+```json
+{
+  "type": "time_sync_response",
+  "request_id": "ABC123-1",
+  "server_timestamp": 1640995200000,
+  "client_timestamp": 1640995200032
+}
+```
+
+#### Time Sync Update (Server → Client)
+
+```json
+{
+  "type": "time_sync_update",
+  "request_id": "ABC123-1",
+  "offset_ms": -16,
+  "latency_ms": 16,
+  "server_timestamp": 1640995200000,
+  "server_receive_timestamp": 1640995200032
+}
+```
+
+Clients can store `offset_ms` and `latency_ms` to estimate server time as `server_time ≈ local_time - offset_ms`.
+
 #### Stop Recording Command
+
 ```json
 {
   "type": "stop_recording",
@@ -127,6 +179,7 @@ PORT=8080 npm start
 ## Error Handling
 
 The server handles various error scenarios:
+
 - Invalid session IDs
 - Full sessions (>2 devices)
 - Network disconnections
@@ -136,6 +189,7 @@ The server handles various error scenarios:
 ## Security Considerations
 
 For production deployment:
+
 - Add authentication/authorization
 - Implement rate limiting
 - Use HTTPS/WSS
@@ -146,16 +200,19 @@ For production deployment:
 ## Deployment
 
 ### Local Development
+
 ```bash
 npm run dev
 ```
 
 ### Production
+
 ```bash
 npm start
 ```
 
 ### Docker (Optional)
+
 ```dockerfile
 FROM node:18-alpine
 WORKDIR /app
@@ -169,6 +226,7 @@ CMD ["npm", "start"]
 ## Monitoring
 
 The server provides health check endpoint at `/health` which returns:
+
 ```json
 {
   "status": "healthy",
@@ -183,11 +241,13 @@ The server provides health check endpoint at `/health` which returns:
 ### Common Issues
 
 1. **Connection Refused**
+
    - Ensure server is running on correct port
    - Check firewall settings
    - Verify WebSocket URL in client
 
 2. **Session Not Found**
+
    - Session may have expired (30 min timeout)
    - Check session ID format (6 characters, alphanumeric)
 
@@ -199,6 +259,7 @@ The server provides health check endpoint at `/health` which returns:
 ### Logs
 
 The server logs important events:
+
 - Session creation/deletion
 - Device connections/disconnections
 - Recording start/stop commands

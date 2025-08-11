@@ -1,17 +1,40 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Platform,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Smartphone, Wifi, Settings, Play, Users, MapPin, Upload, ArrowLeft } from 'lucide-react-native';
+import {
+  Camera,
+  Smartphone,
+  Wifi,
+  Settings,
+  Play,
+  Users,
+  MapPin,
+  Upload,
+  ArrowLeft,
+} from 'lucide-react-native';
 import { router } from 'expo-router';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import {
+  CameraView,
+  useCameraPermissions,
+  useMicrophonePermissions,
+} from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 
 export default function RecordScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
-  const [mediaLibraryPerm, requestMediaLibraryPerm] = MediaLibrary.usePermissions();
-  
+  const [mediaLibraryPerm, requestMediaLibraryPerm] =
+    MediaLibrary.usePermissions();
+
   const [isRecording, setIsRecording] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -60,7 +83,10 @@ export default function RecordScreen() {
       return true;
     } catch (error) {
       console.error('Permission request error:', error);
-      Alert.alert('Permission Error', 'Failed to request permissions. Please try again.');
+      Alert.alert(
+        'Permission Error',
+        'Failed to request permissions. Please try again.'
+      );
       return false;
     }
   };
@@ -88,8 +114,6 @@ export default function RecordScreen() {
           try {
             const recording = await cameraRef.current.recordAsync({
               maxDuration: 3600, // 1 hour max
-              quality: '1080p',
-              mute: false,
             });
 
             if (recording?.uri) {
@@ -97,13 +121,15 @@ export default function RecordScreen() {
             }
           } catch (recordError) {
             console.error('Recording error:', recordError);
-            Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
+            Alert.alert(
+              'Recording Error',
+              'Failed to start recording. Please try again.'
+            );
             setIsRecording(false);
             setShowCamera(false);
           }
         }
       }, 500);
-
     } catch (error) {
       console.error('Start recording error:', error);
       Alert.alert('Error', 'Failed to start recording. Please try again.');
@@ -126,14 +152,18 @@ export default function RecordScreen() {
   const handleRecordingComplete = async (videoUri: string) => {
     try {
       setIsProcessing(true);
-      
+
       // Create asset from the recorded video
       const asset = await MediaLibrary.createAssetAsync(videoUri);
-      
+
       // Create or get the Raydel Recordings album
       let album = await MediaLibrary.getAlbumAsync('Raydel Recordings');
       if (!album) {
-        album = await MediaLibrary.createAlbumAsync('Raydel Recordings', asset, false);
+        album = await MediaLibrary.createAlbumAsync(
+          'Raydel Recordings',
+          asset,
+          false
+        );
       } else {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       }
@@ -141,11 +171,13 @@ export default function RecordScreen() {
       // Show success message
       Alert.alert(
         'Recording Saved',
-        `Video saved successfully to ${Platform.OS === 'ios' ? 'Photos' : 'Gallery'} in "Raydel Recordings" album.`,
+        `Video saved successfully to ${
+          Platform.OS === 'ios' ? 'Photos' : 'Gallery'
+        } in "Raydel Recordings" album.`,
         [
           {
             text: 'View Report',
-            onPress: () => router.push('/report/1')
+            onPress: () => router.push('/report/1'),
           },
           {
             text: 'Record Another',
@@ -153,11 +185,10 @@ export default function RecordScreen() {
               setIsRecording(false);
               setShowCamera(false);
               setIsProcessing(false);
-            }
-          }
+            },
+          },
         ]
       );
-
     } catch (error) {
       console.error('Save recording error:', error);
       Alert.alert(
@@ -179,31 +210,34 @@ export default function RecordScreen() {
   if (showCamera && Platform.OS !== 'web') {
     return (
       <View style={styles.cameraContainer}>
-        <CameraView 
-          ref={cameraRef} 
-          style={styles.camera} 
-          facing="back" 
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing="back"
           mode="video"
-          onRecordingStatusChange={(status) => {
-            if (!status.isRecording && isRecording) {
-              // Recording stopped
-              setIsRecording(false);
-            }
-          }}
         />
-        
+
         <View style={styles.cameraOverlay}>
           {/* Recording indicator */}
           <View style={styles.recordingIndicator}>
-            <View style={[styles.recordingDot, { backgroundColor: isRecording ? '#FF0000' : '#666' }]} />
+            <View
+              style={[
+                styles.recordingDot,
+                { backgroundColor: isRecording ? '#FF0000' : '#666' },
+              ]}
+            />
             <Text style={styles.recordingText}>
-              {isProcessing ? 'PROCESSING...' : (isRecording ? 'RECORDING' : 'STOPPED')}
+              {isProcessing
+                ? 'PROCESSING...'
+                : isRecording
+                ? 'RECORDING'
+                : 'STOPPED'}
             </Text>
           </View>
 
           {/* Control buttons */}
           <View style={styles.cameraControls}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.backButton}
               onPress={() => {
                 if (isRecording) {
@@ -216,7 +250,7 @@ export default function RecordScreen() {
               <ArrowLeft size={24} color="#fff" />
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.stopButton, isProcessing && styles.disabledButton]}
               onPress={handleStopRecording}
               disabled={!isRecording || isProcessing}
@@ -234,12 +268,9 @@ export default function RecordScreen() {
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#1a1a1a', '#2a2a2a']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#1a1a1a', '#2a2a2a']} style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.headerBackButton}
             onPress={() => router.back()}
           >
@@ -248,21 +279,35 @@ export default function RecordScreen() {
           <Text style={styles.headerTitle}>Record Match</Text>
           <View style={styles.placeholder} />
         </View>
-        <Text style={styles.headerSubtitle}>Set up dual cameras for AI analysis</Text>
+        <Text style={styles.headerSubtitle}>
+          Set up dual cameras for AI analysis
+        </Text>
       </LinearGradient>
 
       {/* Camera Status Cards */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Camera Setup</Text>
-        
+
         <View style={styles.cameraCard}>
           <View style={styles.cameraHeader}>
             <Smartphone size={24} color="#00D4FF" />
             <Text style={styles.cameraTitle}>Primary Camera</Text>
-            <View style={[styles.statusDot, { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]} />
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+              ]}
+            />
           </View>
-          <Text style={styles.cameraDescription}>Mount on back wall (Player 1 side)</Text>
-          <Text style={[styles.cameraStatus, { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]}>
+          <Text style={styles.cameraDescription}>
+            Mount on back wall (Player 1 side)
+          </Text>
+          <Text
+            style={[
+              styles.cameraStatus,
+              { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+            ]}
+          >
             {camPerm?.granted ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
@@ -271,10 +316,22 @@ export default function RecordScreen() {
           <View style={styles.cameraHeader}>
             <Smartphone size={24} color="#00D4FF" />
             <Text style={styles.cameraTitle}>Secondary Camera</Text>
-            <View style={[styles.statusDot, { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]} />
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+              ]}
+            />
           </View>
-          <Text style={styles.cameraDescription}>Mount on back wall (Player 2 side)</Text>
-          <Text style={[styles.cameraStatus, { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' }]}>
+          <Text style={styles.cameraDescription}>
+            Mount on back wall (Player 2 side)
+          </Text>
+          <Text
+            style={[
+              styles.cameraStatus,
+              { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+            ]}
+          >
             {camPerm?.granted ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
@@ -283,7 +340,7 @@ export default function RecordScreen() {
       {/* Setup Instructions */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Setup Instructions</Text>
-        
+
         <View style={styles.instructionCard}>
           <View style={styles.instructionStep}>
             <View style={styles.stepNumber}>
@@ -326,7 +383,7 @@ export default function RecordScreen() {
       {/* Match Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Match Settings</Text>
-        
+
         <TouchableOpacity style={styles.settingCard}>
           <Users size={20} color="#00D4FF" />
           <View style={styles.settingContent}>
@@ -354,7 +411,7 @@ export default function RecordScreen() {
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => router.push('/sync-recording')}
         >
@@ -362,7 +419,7 @@ export default function RecordScreen() {
           <Text style={styles.secondaryButtonText}>Sync Recording</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => router.push('/upload')}
         >
@@ -370,7 +427,7 @@ export default function RecordScreen() {
           <Text style={styles.secondaryButtonText}>Upload Video</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.secondaryButton}
           onPress={handleCameraSetup}
         >
@@ -378,18 +435,29 @@ export default function RecordScreen() {
           <Text style={styles.secondaryButtonText}>Setup Cameras</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.primaryButton, (isRecording || isProcessing) && styles.disabledButton]}
+        <TouchableOpacity
+          style={[
+            styles.primaryButton,
+            (isRecording || isProcessing) && styles.disabledButton,
+          ]}
           onPress={handleStartRecording}
           disabled={isRecording || isProcessing}
         >
           <LinearGradient
-            colors={isRecording || isProcessing ? ['#333', '#333'] : ['#00FF88', '#00CC6A']}
+            colors={
+              isRecording || isProcessing
+                ? ['#333', '#333']
+                : ['#00FF88', '#00CC6A']
+            }
             style={styles.primaryButtonGradient}
           >
             <Play size={20} color="#fff" />
             <Text style={styles.primaryButtonText}>
-              {isProcessing ? 'Processing...' : (isRecording ? 'Recording...' : 'Start Recording')}
+              {isProcessing
+                ? 'Processing...'
+                : isRecording
+                ? 'Recording...'
+                : 'Start Recording'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>

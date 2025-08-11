@@ -26,6 +26,10 @@ class SyncSession {
     this.host = null;
     this.isRecording = false;
     this.createdAt = new Date();
+    // Per-device time sync data: { offsetMs, latencyMs, updatedAt }
+    this.timeSync = new Map();
+    // Incrementing ID for time sync requests
+    this.timeSyncRequestCounter = 0;
   }
 
   addDevice(ws, deviceInfo) {
@@ -54,6 +58,9 @@ class SyncSession {
     });
 
     console.log(`Device ${device.name} joined session ${this.id}`);
+
+    // Kick off an initial time sync for this device
+    this.sendTimeSyncRequestToDevice(deviceId);
     return device;
   }
 
@@ -80,9 +87,14 @@ class SyncSession {
   }
 
   broadcastToAll(message) {
-    this.devices.forEach(device => {
+    console.log(`📡 broadcastToAll: Sending to ${this.devices.size} devices`);
+    this.devices.forEach((device, deviceId) => {
+      console.log(`📡 Sending to device ${deviceId} (${device.name}), WebSocket state: ${device.ws.readyState}`);
       if (device.ws.readyState === WebSocket.OPEN) {
         device.ws.send(JSON.stringify(message));
+        console.log(`📡 ✅ Message sent to ${device.name}`);
+      } else {
+        console.log(`📡 ❌ WebSocket not open for ${device.name}, state: ${device.ws.readyState}`);
       }
     });
   }
@@ -101,14 +113,24 @@ class SyncSession {
     }
 
     this.isRecording = true;
-    
-    // Send start command to all devices
-    this.broadcastToAll({
+
+    // Schedule an atomic start slightly in the future to absorb latency
+    const bufferTimeMs = 1200;
+    const serverNow = Date.now();
+    const atomicStartTime = serverNow + bufferTimeMs;
+
+    // Broadcast atomic start command to ALL devices (including initiator)
+    const startMessage = {
       type: 'start_recording',
       sessionId: this.id,
-      timestamp: Date.now(),
-      initiator: initiatorDeviceId
-    });
+      atomic_start_time: atomicStartTime,
+      buffer_time_ms: bufferTimeMs,
+      server_now: serverNow,
+      initiator: initiatorDeviceId,
+    };
+
+    console.log(`📡 Broadcasting start_recording to ${this.devices.size} devices:`, startMessage);
+    this.broadcastToAll(startMessage);
 
     console.log(`Recording started in session ${this.id} by device ${initiatorDeviceId}`);
     return { success: true };
@@ -121,7 +143,7 @@ class SyncSession {
 
     this.isRecording = false;
     
-    // Send stop command to all devices
+    // Send stop command to ALL devices (including initiator) so all save their recordings
     this.broadcastToAll({
       type: 'stop_recording',
       sessionId: this.id,
@@ -168,6 +190,34 @@ class SyncSession {
       }))
     };
   }
+
+  // Send a time sync request to all devices in this session
+  sendTimeSyncRequest() {
+    const requestId = `${this.id}-${++this.timeSyncRequestCounter}`;
+    const serverTimestamp = Date.now();
+    this.devices.forEach(device => {
+      if (device.ws.readyState === WebSocket.OPEN) {
+        device.ws.send(JSON.stringify({
+          type: 'time_sync_request',
+          request_id: requestId,
+          server_timestamp: serverTimestamp
+        }));
+      }
+    });
+  }
+
+  // Send a time sync request to a specific device
+  sendTimeSyncRequestToDevice(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device || device.ws.readyState !== WebSocket.OPEN) return;
+    const requestId = `${this.id}-${++this.timeSyncRequestCounter}`;
+    const serverTimestamp = Date.now();
+    device.ws.send(JSON.stringify({
+      type: 'time_sync_request',
+      request_id: requestId,
+      server_timestamp: serverTimestamp
+    }));
+  }
 }
 
 // WebSocket connection handler
@@ -195,14 +245,23 @@ wss.on('connection', (ws, req) => {
           handleStopRecording(message);
           break;
         
+        case 'camera_ready':
+          handleCameraReady(message);
+          break;
+
+        case 'time_sync_response':
+          handleTimeSyncResponse(message);
+          break;
+        
         case 'ping':
           ws.send(JSON.stringify({ type: 'pong' }));
           break;
         
         default:
+          console.log('Unknown message type:', message.type);
           ws.send(JSON.stringify({ 
             type: 'error', 
-            message: 'Unknown message type' 
+            message: 'Unknown message type: ' + message.type
           }));
       }
     } catch (error) {
@@ -280,6 +339,11 @@ wss.on('connection', (ws, req) => {
       isHost: device.isHost,
       sessionStatus: session.getStatus()
     }));
+
+    // After join, perform a few quick time sync requests to stabilize offset
+    setTimeout(() => session.sendTimeSyncRequestToDevice(device.id), 50);
+    setTimeout(() => session.sendTimeSyncRequestToDevice(device.id), 250);
+    setTimeout(() => session.sendTimeSyncRequestToDevice(device.id), 500);
   }
 
   function handleStartRecording(message) {
@@ -315,6 +379,63 @@ wss.on('connection', (ws, req) => {
         type: 'error', 
         message: result.message 
       }));
+    }
+  }
+
+  function handleCameraReady(message) {
+    if (!currentSession || !currentDeviceId) {
+      ws.send(JSON.stringify({ 
+        type: 'error', 
+        message: 'Not connected to a session' 
+      }));
+      return;
+    }
+
+    // Broadcast camera ready status to other devices in the session
+    currentSession.broadcastToOthers(currentDeviceId, {
+      type: 'camera_ready',
+      deviceId: currentDeviceId
+    });
+
+    console.log('Camera ready signal from device', currentDeviceId, 'in session', currentSession.id);
+  }
+
+  function handleTimeSyncResponse(message) {
+    try {
+      if (!currentSession || !currentDeviceId) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Not connected to a session' }));
+        return;
+      }
+
+      const { request_id, client_timestamp, server_timestamp } = message;
+      if (typeof client_timestamp !== 'number' || typeof server_timestamp !== 'number') {
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid time_sync_response payload' }));
+        return;
+      }
+
+      const serverReceiveTs = Date.now();
+      const rtt = serverReceiveTs - server_timestamp;
+      const latency = rtt / 2;
+      const offset = client_timestamp - (server_timestamp + latency);
+
+      // Store per-device time sync info
+      currentSession.timeSync.set(currentDeviceId, {
+        offsetMs: offset,
+        latencyMs: latency,
+        updatedAt: new Date()
+      });
+
+      // Send an update back to the device
+      ws.send(JSON.stringify({
+        type: 'time_sync_update',
+        request_id,
+        offset_ms: offset,
+        latency_ms: latency,
+        server_timestamp: server_timestamp,
+        server_receive_timestamp: serverReceiveTs
+      }));
+    } catch (err) {
+      console.error('Error handling time_sync_response:', err);
     }
   }
 });
@@ -367,12 +488,14 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000);
 
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
-  console.log(`Sync server running on port ${PORT}`);
-  console.log(`WebSocket endpoint: ws://localhost:${PORT}/sync`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
+// Bind to 0.0.0.0 so phones on the LAN can reach the server via your Mac's IP
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Sync server running on 0.0.0.0:${PORT}`);
+  console.log(`WebSocket endpoint (local): ws://localhost:${PORT}/sync`);
+  console.log(`Health check (local): http://localhost:${PORT}/health`);
+  console.log('If accessing from a phone, use your machine\'s LAN IP (e.g., ws://<Your-IP>:' + PORT + '/sync)');
 });
 
 // Graceful shutdown

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start)",
+      "Bash(curl:*)",
+      "Bash(rm:*)",
+      "Bash(npm install)",
+      "Bash(watchman watch-del-all:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npx expo start:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": []
+  }
+}

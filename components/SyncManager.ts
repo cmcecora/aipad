@@ -19,7 +19,7 @@ export interface SyncSession {
 }
 
 export interface SyncMessage {
-  type: 'join' | 'start_recording' | 'stop_recording' | 'device_connected' | 'device_disconnected' | 'error' | 'ping' | 'pong';
+  type: 'join' | 'start_recording' | 'stop_recording' | 'device_connected' | 'device_disconnected' | 'error' | 'ping' | 'pong' | 'time_sync_request' | 'time_sync_update';
   sessionId?: string;
   deviceId?: string;
   deviceName?: string;
@@ -27,6 +27,13 @@ export interface SyncMessage {
   timestamp?: number;
   message?: string;
   data?: any;
+  // time sync fields
+  request_id?: string;
+  server_timestamp?: number;
+  server_receive_timestamp?: number;
+  offset_ms?: number;
+  latency_ms?: number;
+  atomic_start_time?: number;
 }
 
 export class SyncManager {
@@ -36,6 +43,9 @@ export class SyncManager {
   private reconnectDelay = 1000;
   private pingInterval: NodeJS.Timeout | null = null;
   private serverUrl: string;
+  private clockOffsetMs = 0; // server_time ≈ local_time - offset
+  private latencyMs = 0;
+  private lastSyncAt: number | null = null;
 
   // Event callbacks
   private onConnectionChange?: (status: 'connecting' | 'connected' | 'disconnected') => void;
@@ -46,7 +56,7 @@ export class SyncManager {
   private onError?: (error: string) => void;
   private onSessionUpdate?: (session: Partial<SyncSession>) => void;
 
-  constructor(serverUrl: string = 'ws://localhost:3002/sync') {
+  constructor(serverUrl: string = 'ws://localhost:3001/sync') {
     this.serverUrl = serverUrl;
   }
 
@@ -260,11 +270,20 @@ export class SyncManager {
 
       case 'start_recording':
         console.log('Received start recording command');
-        this.onRecordingStart?.();
-        this.onSessionUpdate?.({ 
-          isRecording: true,
-          status: 'recording'
-        });
+        // If an atomic start time is provided, delay local callback until that wall-clock time
+        if (message.atomic_start_time && typeof message.atomic_start_time === 'number') {
+          const localNow = Date.now();
+          const serverNowEstimate = localNow - this.clockOffsetMs; // server ≈ local - offset
+          const delayMs = message.atomic_start_time - serverNowEstimate;
+          const clampedDelay = Math.max(0, Math.min(delayMs, 5000));
+          setTimeout(() => {
+            this.onRecordingStart?.();
+            this.onSessionUpdate?.({ isRecording: true, status: 'recording' });
+          }, clampedDelay);
+        } else {
+          this.onRecordingStart?.();
+          this.onSessionUpdate?.({ isRecording: true, status: 'recording' });
+        }
         break;
 
       case 'stop_recording':
@@ -274,6 +293,26 @@ export class SyncManager {
           isRecording: false,
           status: 'connected'
         });
+        break;
+
+      case 'time_sync_request':
+        // Reply immediately with local timestamp
+        if (message.request_id && typeof message.server_timestamp === 'number') {
+          this.sendMessage({
+            type: 'time_sync_response' as any,
+            request_id: message.request_id,
+            server_timestamp: message.server_timestamp,
+            client_timestamp: Date.now() as any
+          } as any);
+        }
+        break;
+
+      case 'time_sync_update':
+        if (typeof message.offset_ms === 'number' && typeof message.latency_ms === 'number') {
+          this.clockOffsetMs = message.offset_ms;
+          this.latencyMs = message.latency_ms;
+          this.lastSyncAt = Date.now();
+        }
         break;
 
       case 'error':

@@ -7,10 +7,10 @@ import {
   TextInput,
   Alert,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import {
   ArrowLeft,
@@ -23,6 +23,7 @@ import {
   CircleCheck as CheckCircle,
   CircleAlert as AlertCircle,
   Copy,
+  Camera,
 } from 'lucide-react-native';
 import {
   CameraView,
@@ -53,15 +54,15 @@ export default function SyncRecordingScreen() {
   const [connectedDeviceName, setConnectedDeviceName] = useState('');
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [shouldShowCamera, setShouldShowCamera] = useState(false);
-  const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
+  const [otherDeviceCameraReady, setOtherDeviceCameraReady] = useState(false);
+  const [isRecordingAttemptInProgress, setIsRecordingAttemptInProgress] = useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const connectionStatusRef = useRef<
-    'connecting' | 'connected' | 'disconnected'
-  >('disconnected');
-  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cameraInitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
@@ -77,8 +78,8 @@ export default function SyncRecordingScreen() {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
       }
-      if (pingIntervalRef.current) {
-        clearInterval(pingIntervalRef.current);
+      if (cameraInitTimeoutRef.current) {
+        clearTimeout(cameraInitTimeoutRef.current);
       }
     };
   }, []);
@@ -115,6 +116,8 @@ export default function SyncRecordingScreen() {
         : `${envUrl.replace(/\/$/, '')}/sync`;
     }
 
+    // For physical devices, we need to use the actual IP address
+    // Check if we're running on a physical device by looking at the debugger host
     let host: string | undefined;
     const debuggerHost =
       (Constants as any)?.expoGoConfig?.debuggerHost ||
@@ -122,83 +125,59 @@ export default function SyncRecordingScreen() {
       (Constants as any)?.manifest?.debuggerHost;
 
     if (typeof debuggerHost === 'string') {
+      // Extract the IP address from debugger host (e.g., "192.168.1.222:8081" -> "192.168.1.222")
       host = debuggerHost.split(':')[0];
+
+      // If it's a local IP address (192.168.x.x or 10.x.x.x), use it
       if (host.startsWith('192.168.') || host.startsWith('10.')) {
         console.log('Using network IP for sync server:', host);
       } else if (host === 'localhost' || host === '127.0.0.1') {
+        // Running in simulator/emulator
         if (Platform.OS === 'android') {
-          host = '10.0.2.2';
+          host = '10.0.2.2'; // Android emulator loopback to host
         } else {
-          host = 'localhost';
+          host = 'localhost'; // iOS simulator or web
         }
       }
     } else {
+      // Fallback to localhost if we can't determine the host
       host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
     }
 
-    // Prefer env override for phones on LAN (e.g., ws://192.168.x.x:3002/sync)
-    const url = `ws://${host}:3001/sync`;
+    const protocol = 'ws';
+    const port = 3001;
+    const url = `${protocol}://${host}:${port}/sync`;
     console.log('WebSocket URL:', url);
     return url;
   };
 
   const connectToSyncServer = (sessionId: string, isHost: boolean) => {
     try {
+      // Connect to the sync server WebSocket endpoint. The session is passed in the first message.
       const url = resolveSyncServerUrl();
-      console.log(
-        '[SYNC][WS] Connecting to WebSocket:',
-        url,
-        'isHost:',
-        isHost
-      );
-      console.log('[SYNC][WS] Platform:', Platform.OS);
-      console.log('[SYNC][WS] SessionId:', sessionId);
-
+      console.log('Connecting to WebSocket:', url);
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log(
-          '[SYNC][WS][OPEN] ✅ Successfully connected to sync server'
-        );
+        console.log('Connected to sync server');
         setConnectionStatus('connecting');
-        connectionStatusRef.current = 'connecting';
 
+        // Send initial connection message
         const joinMessage = {
           type: 'join',
           sessionId,
           isHost,
-          deviceName: `${Platform.OS.toUpperCase()}-${
-            isHost ? 'HOST' : 'JOIN'
-          }-${Math.random().toString(36).substring(2, 6)}`,
+          deviceName: `Device ${Math.random().toString(36).substring(7)}`,
         };
-        console.log('[SYNC][WS][SEND] join ->', joinMessage);
-        try {
-          ws.send(JSON.stringify(joinMessage));
-          console.log('[SYNC][WS][SEND] ✅ Join message sent successfully');
-        } catch (sendError) {
-          console.error(
-            '[SYNC][WS][SEND] ❌ Failed to send join message:',
-            sendError
-          );
-        }
-
-        // Start keepalive ping interval (every 30 seconds)
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-        }
-        pingIntervalRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            console.log('[SYNC][WS][PING] Sending keepalive ping');
-            ws.send(JSON.stringify({ type: 'ping' }));
-          }
-        }, 30000);
+        console.log('Sending join message:', joinMessage);
+        ws.send(JSON.stringify(joinMessage));
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('[SYNC][WS][RECV]', message);
+          console.log('Received message:', message);
           handleSyncMessage(message);
         } catch (e) {
           console.error('Error parsing message:', e);
@@ -206,57 +185,52 @@ export default function SyncRecordingScreen() {
       };
 
       ws.onclose = (event) => {
-        console.log('[SYNC][WS][CLOSE] ❌ WebSocket connection closed');
-        console.log('[SYNC][WS][CLOSE] ❌ Code:', event.code);
-        console.log('[SYNC][WS][CLOSE] ❌ Reason:', event.reason);
-        console.log('[SYNC][WS][CLOSE] ❌ WasClean:', event.wasClean);
-        console.error(
-          '[SYNC][WS][CLOSE] ❌ Connection lost - this will break sync!'
-        );
+        console.log('WebSocket closed:', event.code, event.reason);
         setConnectionStatus('disconnected');
-        connectionStatusRef.current = 'disconnected';
         setSession((prev) =>
           prev ? { ...prev, status: 'disconnected' } : null
         );
 
-        // Clear ping interval
-        if (pingIntervalRef.current) {
-          clearInterval(pingIntervalRef.current);
-          pingIntervalRef.current = null;
+        // Only show alert for unexpected disconnections
+        if (event.code !== 1000 && event.code !== 1001) {
+          Alert.alert(
+            'Connection Lost',
+            'Connection to sync server was lost. Please try again.'
+          );
         }
       };
 
       ws.onerror = (error) => {
-        console.error(
-          '[SYNC][WS][ERROR] ❌ WebSocket connection failed:',
-          error
-        );
-        console.error('[SYNC][WS][ERROR] ❌ URL was:', url);
-        console.error('[SYNC][WS][ERROR] ❌ Platform:', Platform.OS);
+        console.error('WebSocket error details:', error);
         setConnectionStatus('disconnected');
-        connectionStatusRef.current = 'disconnected';
-        Alert.alert(
-          'Connection Error',
-          `Failed to connect to sync server at ${url}. Make sure the server is running and accessible.`
-        );
+
+        // Provide more specific error message
+        let errorMessage = 'Failed to connect to sync server.';
+        const errorString = JSON.stringify(error);
+
+        if (errorString.includes('1005')) {
+          errorMessage =
+            'Connection closed unexpectedly. Please check your network and try again.';
+        } else if (errorString.includes('ECONNREFUSED')) {
+          errorMessage =
+            'Cannot reach sync server. Make sure the server is running on port 3001.';
+        }
+
+        Alert.alert('Connection Error', errorMessage);
       };
     } catch (error) {
       console.error('Failed to create WebSocket:', error);
-      Alert.alert('Connection Error', 'Failed to initialize connection.');
+      Alert.alert(
+        'Connection Error',
+        'Failed to initialize connection. Please check your network settings.'
+      );
     }
   };
 
   const handleSyncMessage = (message: any) => {
     switch (message.type) {
       case 'device_connected':
-        console.log(
-          '📱 Device connected - setting up camera but NOT starting recording'
-        );
-        console.log(
-          '📱 Setting connectionStatus to CONNECTED (device_connected)'
-        );
         setConnectionStatus('connected');
-        connectionStatusRef.current = 'connected';
         setConnectedDeviceName(message.deviceName);
         setSession((prev) =>
           prev
@@ -267,119 +241,68 @@ export default function SyncRecordingScreen() {
               }
             : null
         );
+        // Now both devices are connected - show camera and initialize
+        console.log('📷 Device connected - showing camera and initializing');
         setShouldShowCamera(true);
-        setTimeout(() => {
+        // Give camera time to initialize (2 seconds)
+        cameraInitTimeoutRef.current = setTimeout(() => {
+          console.log('📷 ✅ Camera marked as ready after timeout');
           setIsCameraReady(true);
-          console.log(
-            '📷 Camera is now ready - waiting for user to press Start Recording'
-          );
         }, 2000);
-        Alert.alert(
-          'Device Connected',
-          `Connected to ${message.deviceName}. Press "Start Sync Recording" to begin.`
-        );
+        Alert.alert('Device Connected', `Connected to ${message.deviceName}`);
         break;
 
       case 'joined':
-        console.log(
-          '📱 Successfully joined session - setting up camera but NOT starting recording'
-        );
-        console.log('📱 Setting connectionStatus to CONNECTED');
+        // This handles when we successfully join a session
+        console.log('📷 Successfully joined session:', message.sessionId);
+        console.log('📷 Setting up camera for joined session');
         setConnectionStatus('connected');
-        connectionStatusRef.current = 'connected';
         setShouldShowCamera(true);
-        setTimeout(() => {
-          setIsCameraReady(true);
+        // Initialize camera for the joining device
+        cameraInitTimeoutRef.current = setTimeout(() => {
           console.log(
-            '📷 Camera is now ready - waiting for user to press Start Recording'
+            '📷 ✅ Joined session camera marked as ready after timeout'
           );
+          setIsCameraReady(true);
         }, 2000);
         break;
 
-      case 'start_recording': {
-        console.log('🎯 Received start_recording from server');
-        const atomic = (message as any).atomic_start_time as number | undefined;
-        const now = Date.now();
-        let delay = 100;
-        if (typeof atomic === 'number') {
-          delay = Math.max(0, Math.min(atomic - now, 5000));
-          console.log('⏱ Using atomic_start_time; scheduling in', delay, 'ms');
-        }
-
-        console.log('🎯 Current state:', {
-          isRecording,
-          connectionStatus,
-          isCameraReady,
-          hasCameraRef: !!cameraRef.current,
-        });
-
-        const doStart = () => {
-          // Use ref for connection status to avoid stale closures
-          const currentConnectionStatus = connectionStatusRef.current;
-          const currentIsRecording = isRecording;
-          const currentCameraRef = cameraRef.current;
-
-          console.log('🎬 doStart() called with state:', {
-            isRecording: currentIsRecording,
-            connectionStatus: currentConnectionStatus,
-            hasCameraRef: !!currentCameraRef,
-          });
-
-          // Check if we can start recording - must be connected and not already recording
-          const canStart =
-            !currentIsRecording &&
-            !!currentCameraRef &&
-            currentConnectionStatus === 'connected';
-
-          if (canStart) {
-            console.log('🎬 ✅ Starting recording from server sync command');
-            setIsRecording(true);
-            setSession((prev) =>
-              prev ? { ...prev, status: 'recording' } : null
-            );
-            setTimeout(() => startActualRecording(), 50);
-          } else {
-            console.log('🎬 ❌ Cannot start recording:', {
-              alreadyRecording: currentIsRecording,
-              noCameraRef: !currentCameraRef,
-              notConnected: currentConnectionStatus !== 'connected',
-              actualStatus: currentConnectionStatus,
-            });
-          }
-        };
-
-        setTimeout(doStart, delay);
+      case 'camera_ready':
+        // Handle camera ready confirmation from other device
+        console.log('📷 🎯 Received camera_ready from other device');
+        setOtherDeviceCameraReady(true);
         break;
-      }
+
+      case 'start_recording':
+        console.log('🎯 Received start_recording message from server');
+        
+        // If not already recording, start immediately with minimal delay for sync
+        if (!isRecording) {
+          console.log('🎬 Starting recording from sync command');
+          setIsRecording(true);
+          setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
+          
+          // Small delay to ensure UI updates, then start recording
+          setTimeout(() => {
+            handleStartRecording(true);
+          }, 50);
+        } else {
+          console.log('🔄 Already recording, ignoring sync start command');
+        }
+        break;
 
       case 'stop_recording':
-        console.log('🛑 Received stop_recording from server');
-        console.log('🛑 Current state:', {
-          isRecording,
-          hasCameraRef: !!cameraRef.current,
-        });
+        console.log('🛑 Received stop_recording message from server');
 
-        // Update UI state first
-        setIsRecording(false);
-        setCameraMode('picture');
-        setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
-
-        // Stop camera recording if currently recording
-        if (isRecording && cameraRef.current) {
-          console.log('🛑 Stopping camera recording from sync command');
-          setTimeout(() => {
-            if (cameraRef.current) {
-              cameraRef.current.stopRecording();
-            }
-          }, 100);
-        } else {
-          console.log('🛑 Not recording locally, UI updated for sync');
-        }
+        // Always process stop recording command to ensure both devices save their recordings
+        console.log(
+          '🛑 Processing stop command - ensuring local recording is saved'
+        );
+        handleStopRecording(true); // true indicates sync command
         break;
 
       case 'device_disconnected':
         setConnectionStatus('disconnected');
-        connectionStatusRef.current = 'disconnected';
         setConnectedDeviceName('');
         setSession((prev) => (prev ? { ...prev, status: 'waiting' } : null));
         Alert.alert(
@@ -389,212 +312,49 @@ export default function SyncRecordingScreen() {
         break;
 
       case 'error':
-        Alert.alert('Sync Error', message.message);
+        console.log('❌ Received error from server:', message.message);
+
+        // Handle specific error cases
+        if (message.message === 'Recording already in progress') {
+          // Server says recording already in progress, but our UI might be out of sync
+          console.log(
+            '🔄 Server says recording already in progress - syncing UI state'
+          );
+          if (!isRecording) {
+            setIsRecording(true);
+            setSession((prev) =>
+              prev ? { ...prev, status: 'recording' } : null
+            );
+          }
+          // Don't show alert for this case since it's a state sync issue
+        } else {
+          Alert.alert('Sync Error', message.message);
+        }
+
+        // Clear attempt flag on any error
+        setIsRecordingAttemptInProgress(false);
         break;
     }
   };
 
   const sendSyncCommand = (command: string, data?: any) => {
-    const readyState = wsRef.current?.readyState;
-    console.log(
-      '[SYNC][SEND] command:',
-      command,
-      'readyState:',
-      readyState,
-      'OPEN:',
-      WebSocket.OPEN
-    );
-    if (wsRef.current && readyState === WebSocket.OPEN) {
-      const payload = { type: command, ...data };
-      try {
-        wsRef.current.send(JSON.stringify(payload));
-        console.log('[SYNC][SEND][OK]', payload);
-      } catch (e) {
-        console.error('[SYNC][SEND][ERROR]', e);
-      }
+    console.log(`📡 === SENDING SYNC COMMAND ===`);
+    console.log(`📡 Command: ${command}`);
+    console.log(`📡 WebSocket state: ${wsRef.current?.readyState}`);
+    console.log(`📡 WebSocket OPEN constant: ${WebSocket.OPEN}`);
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const payload = {
+        type: command,
+        ...data,
+      };
+      console.log(`📡 Sending payload:`, payload);
+      wsRef.current.send(JSON.stringify(payload));
+      console.log(`📡 ✅ Command sent successfully`);
     } else {
-      console.warn(
-        '[SYNC][SEND][SKIP] WebSocket not open, cannot send command'
-      );
+      console.log(`📡 ❌ Cannot send - WebSocket not open`);
     }
-  };
-
-  const ensurePermissions = async (): Promise<boolean> => {
-    try {
-      if (!camPerm?.granted) {
-        const camResult = await requestCamPerm();
-        if (!camResult.granted) {
-          Alert.alert(
-            'Camera Permission Required',
-            'Please enable camera access to record videos.'
-          );
-          return false;
-        }
-      }
-
-      if (!micPerm?.granted) {
-        const micResult = await requestMicPerm();
-        if (!micResult.granted) {
-          Alert.alert(
-            'Microphone Permission Required',
-            'Please enable microphone access to record audio.'
-          );
-          return false;
-        }
-      }
-
-      if (!mediaLibraryPerm?.granted) {
-        const mediaResult = await requestMediaLibraryPerm();
-        if (!mediaResult.granted) {
-          Alert.alert(
-            'Storage Permission Required',
-            'Please enable storage access to save videos.'
-          );
-          return false;
-        }
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Permission error:', error);
-      Alert.alert('Permission Error', 'Failed to request permissions.');
-      return false;
-    }
-  };
-
-  const handleStartRecording = async () => {
-    console.log('🎬 User clicked Start Recording');
-
-    if (connectionStatus !== 'connected') {
-      Alert.alert(
-        'Not Connected',
-        'Please wait for both devices to be connected.'
-      );
-      return;
-    }
-
-    if (isRecording) {
-      console.log('Already recording, ignoring');
-      return;
-    }
-
-    const hasPermissions = await ensurePermissions();
-    if (!hasPermissions) return;
-
-    if (!cameraRef.current) {
-      Alert.alert(
-        'Camera Not Ready',
-        'Please wait for the camera to initialize.'
-      );
-      return;
-    }
-
-    // Send sync command to start both devices
-    console.log('[SYNC][START] Sending start_recording command to server');
-    sendSyncCommand('start_recording');
-
-    // Immediately update local UI so button flips to Stop and REC timer appears
-    // The actual recording will begin when the server broadcast arrives
-    setIsRecording(true);
-    setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
-  };
-
-  const startActualRecording = async () => {
-    try {
-      console.log('[SYNC][RECORD] Starting camera recording...');
-      if (!cameraRef.current) return;
-
-      // Switch to video mode before recording
-      console.log('[SYNC][RECORD] Switching camera to video mode');
-      setCameraMode('video');
-
-      // Give camera a moment to switch modes, then start recording directly
-      console.log('[SYNC][RECORD] Waiting for camera mode switch...');
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      console.log('[SYNC][RECORD] Starting recordAsync()');
-      const recording = await cameraRef.current.recordAsync({
-        maxDuration: 3600,
-      });
-
-      console.log(
-        '[SYNC][RECORD] recordAsync() resolved. URI:',
-        recording?.uri
-      );
-      if (recording?.uri) {
-        await saveRecording(recording.uri);
-      }
-    } catch (error) {
-      console.error('❌ Recording error:', error);
-      Alert.alert(
-        'Recording Error',
-        'Camera failed to start recording. Please try again.'
-      );
-      setIsRecording(false);
-      setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
-      // Reset camera mode on error
-      setCameraMode('picture');
-    }
-  };
-
-  const handleStopRecording = async () => {
-    console.log('🛑 User clicked Stop Recording');
-
-    if (!isRecording) return;
-
-    // Send sync command to stop both devices (server will broadcast back to both)
-    console.log('[SYNC][STOP] Sending stop_recording command to server');
-    sendSyncCommand('stop_recording');
-
-    // Immediately update local UI so button flips back to Start
-    setIsRecording(false);
-    setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
-    setCameraMode('picture');
-  };
-
-  const saveRecording = async (videoUri: string) => {
-    try {
-      console.log('💾 Saving recording:', videoUri);
-
-      const asset = await MediaLibrary.createAssetAsync(videoUri);
-
-      let album = await MediaLibrary.getAlbumAsync('Raydel Sync Recordings');
-      if (!album) {
-        album = await MediaLibrary.createAlbumAsync(
-          'Raydel Sync Recordings',
-          asset,
-          false
-        );
-      } else {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-      }
-
-      Alert.alert(
-        'Recording Saved',
-        `Synchronized recording saved to ${
-          Platform.OS === 'ios' ? 'Photos' : 'Gallery'
-        }!`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset UI state and camera mode
-              setIsRecording(false);
-              setCameraMode('picture');
-              setSession((prev) =>
-                prev ? { ...prev, status: 'connected' } : null
-              );
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('💾 Save error:', error);
-      Alert.alert('Save Error', 'Failed to save recording to gallery.');
-      setIsRecording(false);
-      setCameraMode('picture');
-      setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
-    }
+    console.log(`📡 === END SYNC COMMAND ===`);
   };
 
   const handleHostSession = () => {
@@ -606,9 +366,10 @@ export default function SyncRecordingScreen() {
       status: 'waiting',
     });
     setSessionMode('host');
+    // Don't show camera until another device connects
     setShouldShowCamera(false);
     setIsCameraReady(false);
-    setCameraMode('picture');
+    setIsRecordingAttemptInProgress(false);
     connectToSyncServer(newSessionId, true);
   };
 
@@ -624,10 +385,382 @@ export default function SyncRecordingScreen() {
       status: 'waiting',
     });
     setSessionMode('join');
+    // Don't show camera until connection is established
     setShouldShowCamera(false);
     setIsCameraReady(false);
-    setCameraMode('picture');
+    setIsRecordingAttemptInProgress(false);
     connectToSyncServer(inputSessionId.toUpperCase(), false);
+  };
+
+  const ensurePermissions = async (): Promise<boolean> => {
+    try {
+      console.log('🔒 Checking permissions...');
+      console.log('🔒 Current camera permission:', camPerm?.granted);
+      console.log('🔒 Current microphone permission:', micPerm?.granted);
+      console.log(
+        '🔒 Current media library permission:',
+        mediaLibraryPerm?.granted
+      );
+
+      if (!camPerm?.granted) {
+        console.log('🔒 Requesting camera permission...');
+        const camResult = await requestCamPerm();
+        if (!camResult.granted) {
+          console.log('❌ Camera permission denied');
+          Alert.alert(
+            'Camera Permission Required',
+            'Please enable camera access to record videos.'
+          );
+          return false;
+        }
+        console.log('✅ Camera permission granted');
+      }
+
+      if (!micPerm?.granted) {
+        console.log('🔒 Requesting microphone permission...');
+        const micResult = await requestMicPerm();
+        if (!micResult.granted) {
+          console.log('❌ Microphone permission denied');
+          Alert.alert(
+            'Microphone Permission Required',
+            'Please enable microphone access to record audio.'
+          );
+          return false;
+        }
+        console.log('✅ Microphone permission granted');
+      }
+
+      if (!mediaLibraryPerm?.granted) {
+        console.log('🔒 Requesting media library permission...');
+        const mediaResult = await requestMediaLibraryPerm();
+        if (!mediaResult.granted) {
+          console.log('❌ Media library permission denied');
+          Alert.alert(
+            'Storage Permission Required',
+            'Please enable storage access to save videos.'
+          );
+          return false;
+        }
+        console.log('✅ Media library permission granted');
+      }
+
+      console.log('✅ All permissions granted');
+      return true;
+    } catch (error) {
+      console.error('❌ Permission error:', error);
+      Alert.alert('Permission Error', 'Failed to request permissions.');
+      return false;
+    }
+  };
+
+  const handleStartRecording = async (isSync = false, retryCount = 0) => {
+    console.log(`🎬 === START RECORDING DEBUG === `);
+    console.log(`🎬 isSync: ${isSync}`);
+    console.log(`🎬 connectionStatus: ${connectionStatus}`);
+    console.log(`🎬 isCameraReady: ${isCameraReady}`);
+    console.log(`🎬 otherDeviceCameraReady: ${otherDeviceCameraReady}`);
+    console.log(`🎬 cameraRef.current: ${!!cameraRef.current}`);
+    console.log(`🎬 isRecording: ${isRecording}`);
+    console.log(
+      `🎬 isRecordingAttemptInProgress: ${isRecordingAttemptInProgress}`
+    );
+
+    // Prevent multiple simultaneous attempts only for user-initiated starts.
+    // Allow sync-initiated starts to proceed even if a prior user click set the flag.
+    if (isRecordingAttemptInProgress && !isSync) {
+      console.log('🔒 Recording attempt already in progress, ignoring');
+      return;
+    }
+
+    if (isRecording && !isSync) {
+      console.log('⚠️ Already recording, ignoring command');
+      return;
+    }
+
+    if (connectionStatus !== 'connected' && !isSync) {
+      console.log('❌ Connection not ready for user-initiated recording');
+      Alert.alert(
+        'Not Connected',
+        'Please wait for both devices to be connected before recording.'
+      );
+      return;
+    }
+
+    // For user-initiated starts, we schedule via server and immediately update UI
+    if (!isSync) {
+      try {
+        const hasPermissions = await ensurePermissions();
+        if (!hasPermissions) return;
+        if (!cameraRef.current || !isCameraReady) {
+          Alert.alert(
+            'Camera Not Ready',
+            'Please wait for the camera to initialize.'
+          );
+          return;
+        }
+
+        // Set flag to prevent double-clicks
+        setIsRecordingAttemptInProgress(true);
+
+        console.log(
+          '📡 Sending start_recording request; will start on atomic timestamp'
+        );
+        sendSyncCommand('start_recording');
+        return;
+      } catch (err) {
+        console.error('❌ Failed to initiate sync start:', err);
+        Alert.alert('Error', 'Failed to initiate synchronized start.');
+        setIsRecordingAttemptInProgress(false);
+        return;
+      }
+    }
+
+    // Set flag to prevent concurrent attempts for sync-executed start
+    setIsRecordingAttemptInProgress(true);
+
+    try {
+      const hasPermissions = await ensurePermissions();
+      if (!hasPermissions) {
+        console.log('❌ Permissions not granted');
+        return;
+      }
+
+      // Check if camera is ready
+      if (!cameraRef.current || !isCameraReady) {
+        console.log(
+          `❌ Camera not ready - cameraRef: ${!!cameraRef.current}, isCameraReady: ${isCameraReady}`
+        );
+
+        if (isSync && retryCount < 3) {
+          console.log(
+            `⏳ Camera not ready for sync command, retry ${
+              retryCount + 1
+            }/3 in 300ms...`
+          );
+          setTimeout(() => {
+            setIsRecordingAttemptInProgress(false);
+            handleStartRecording(true, retryCount + 1);
+          }, 300);
+          return;
+        } else {
+          console.log('❌ Camera not ready - cannot start recording');
+          if (isSync && retryCount >= 3) {
+            console.log('❌ Max retries reached for sync command');
+          } else {
+            Alert.alert(
+              'Camera Error',
+              'Camera not ready. Please wait a moment and try again.'
+            );
+          }
+          return;
+        }
+      }
+
+      console.log('✅ Starting recording process...');
+
+      // Recording state is already set by the message handler, don't set it again
+      console.log('🔄 This is a sync command - recording state already set');
+
+      // Start recording
+      console.log('🎥 Starting camera recording...');
+      try {
+        cameraIsRecordingRef.current = true;
+        // Flip UI to recording at the moment we begin the camera
+        setIsRecording(true);
+        setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
+        const recording = await cameraRef.current.recordAsync({
+          maxDuration: 3600,
+        });
+
+        console.log('🎥 Recording completed, URI:', recording?.uri);
+        if (recording?.uri) {
+          await saveRecording(recording.uri);
+          console.log('💾 Recording saved successfully');
+        } else {
+          console.log(
+            '⚠️ Recording completed but no URI returned - resetting UI state'
+          );
+          // Only reset state here if no URI (save function handles state reset when successful)
+          setIsRecording(false);
+          setIsRecordingAttemptInProgress(false);
+          setSession((prev) =>
+            prev ? { ...prev, status: 'connected' } : null
+          );
+        }
+      } catch (recordingError) {
+        console.error('❌ Camera recording failed:', recordingError);
+        setIsRecording(false);
+        setIsRecordingAttemptInProgress(false);
+        throw recordingError;
+      } finally {
+        cameraIsRecordingRef.current = false;
+      }
+    } catch (error) {
+      console.error('❌ Recording error:', error);
+      Alert.alert(
+        'Recording Error',
+        'Failed to start recording. Please try again.'
+      );
+      setIsRecording(false);
+    } finally {
+      // Always clear the attempt flag
+      setIsRecordingAttemptInProgress(false);
+    }
+    console.log(`🎬 === END START RECORDING DEBUG === `);
+  };
+
+  const handleStopRecording = async (isSync = false) => {
+    console.log('🛑 === STOP RECORDING DEBUG ===');
+    console.log('🛑 isSync:', isSync);
+    console.log('🛑 isRecording:', isRecording);
+
+    try {
+      // Cancel any pending start timers
+      if (pendingStartTimeoutRef.current) {
+        console.log('🛑 Cancelling pending start timer');
+        clearTimeout(pendingStartTimeoutRef.current);
+        pendingStartTimeoutRef.current = null;
+      }
+
+      // Send sync command to other device first (for user-initiated stops)
+      if (!isSync) {
+        console.log('📡 Sending stop_recording sync command to server');
+        sendSyncCommand('stop_recording');
+      }
+
+      // Stop the camera recording - this will cause recordAsync promise to resolve
+      if (cameraRef.current && cameraIsRecordingRef.current) {
+        console.log('📹 Stopping camera recording...');
+        cameraRef.current.stopRecording();
+        console.log(
+          '📹 Stop command sent - waiting for recordAsync to resolve and save video'
+        );
+        // Immediately update UI back to connected
+        setIsRecording(false);
+        setIsRecordingAttemptInProgress(false);
+        setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
+      } else {
+        console.log('📹 No active recording to stop');
+        // Ensure UI state is reset
+        setIsRecording(false);
+        setIsRecordingAttemptInProgress(false);
+        setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
+      }
+
+      console.log('✅ Stop recording command completed');
+    } catch (error) {
+      console.error('❌ Stop recording error:', error);
+      Alert.alert('Error', 'Failed to stop recording properly.');
+      setIsRecording(false);
+      setIsRecordingAttemptInProgress(false);
+    }
+    console.log('🛑 === END STOP RECORDING DEBUG ===');
+  };
+
+  const saveRecording = async (videoUri: string) => {
+    try {
+      console.log('💾 === SAVING RECORDING ===');
+      console.log('💾 Video URI:', videoUri);
+
+      const asset = await MediaLibrary.createAssetAsync(videoUri);
+
+      let album = await MediaLibrary.getAlbumAsync('Raydel Sync Recordings');
+      if (!album) {
+        album = await MediaLibrary.createAlbumAsync(
+          'Raydel Sync Recordings',
+          asset,
+          false
+        );
+      } else {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      }
+
+      console.log('💾 Recording saved successfully to gallery');
+
+      // Show success message and reset UI state (like record.tsx does)
+      Alert.alert(
+        'Recording Saved',
+        `Synchronized recording saved successfully to ${
+          Platform.OS === 'ios' ? 'Photos' : 'Gallery'
+        } in "Raydel Sync Recordings" album.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('💾 Resetting UI state after save');
+              // Reset UI state after user acknowledges save
+              setIsRecording(false);
+              setIsRecordingAttemptInProgress(false);
+              setSession((prev) =>
+                prev ? { ...prev, status: 'connected' } : null
+              );
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('💾 Save error:', error);
+      Alert.alert(
+        'Save Error',
+        'Recording completed but failed to save to gallery. The video may still be available in your camera roll.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('💾 Resetting UI state after save error');
+              // Reset UI state even on save error
+              setIsRecording(false);
+              setIsRecordingAttemptInProgress(false);
+              setSession((prev) =>
+                prev ? { ...prev, status: 'connected' } : null
+              );
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const copySessionId = () => {
+    // In a real app, you'd use Clipboard API
+    Alert.alert('Session ID Copied', `Session ID: ${sessionId}`);
+  };
+
+  const testConnection = async () => {
+    const url = resolveSyncServerUrl();
+    console.log('Testing connection to:', url);
+
+    try {
+      // Try to connect to health endpoint first
+      const httpUrl = url
+        .replace('ws://', 'http://')
+        .replace('/sync', '/health');
+      const response = await fetch(httpUrl, {
+        method: 'GET',
+        timeout: 5000,
+      } as any);
+
+      if (response.ok) {
+        Alert.alert(
+          'Connection Test',
+          'Server is reachable! Try connecting again.'
+        );
+      } else {
+        Alert.alert(
+          'Connection Test',
+          'Server responded but with an error. Check server logs.'
+        );
+      }
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      Alert.alert(
+        'Connection Test Failed',
+        `Cannot reach server at ${url}. Make sure:\n\n` +
+          '1. The sync server is running on port 3001\n' +
+          '2. Both devices are on the same network\n' +
+          '3. Your firewall allows connections on port 3001'
+      );
+    }
   };
 
   const formatTime = (seconds: number): string => {
@@ -638,7 +771,6 @@ export default function SyncRecordingScreen() {
       .padStart(2, '0')}`;
   };
 
-  // [Rest of the render functions remain the same as the original file...]
   const renderModeSelection = () => (
     <ScrollView style={styles.container}>
       <LinearGradient colors={['#1a1a1a', '#2a2a2a']} style={styles.header}>
@@ -753,6 +885,8 @@ export default function SyncRecordingScreen() {
   );
 
   const renderSessionInterface = () => {
+    // For joined sessions, show camera immediately when connected
+    // For host sessions, show camera only after another device connects
     const showCameraCondition =
       session &&
       (shouldShowCamera ||
@@ -771,7 +905,7 @@ export default function SyncRecordingScreen() {
                   setSession(null);
                   setShouldShowCamera(false);
                   setIsCameraReady(false);
-                  setCameraMode('picture');
+                  setIsRecordingAttemptInProgress(false);
                 }}
               >
                 <ArrowLeft size={24} color="#fff" />
@@ -802,9 +936,19 @@ export default function SyncRecordingScreen() {
               ref={cameraRef}
               style={styles.camera}
               facing="back"
-              mode={cameraMode}
+              mode="video"
               onCameraReady={() => {
-                console.log('📷 Camera ready callback, mode:', cameraMode);
+                console.log('📷 CameraView onCameraReady callback fired');
+                console.log('📷 Connection status:', connectionStatus);
+                // Send camera ready signal if connected
+                if (connectionStatus === 'connected') {
+                  console.log('📷 Sending camera_ready signal to server');
+                  sendSyncCommand('camera_ready');
+                } else {
+                  console.log(
+                    '📷 Not sending camera_ready - not connected yet'
+                  );
+                }
               }}
             />
 
@@ -826,6 +970,16 @@ export default function SyncRecordingScreen() {
                   <Text style={styles.sessionIdText}>
                     Session: {session.id}
                   </Text>
+                  {!isCameraReady && (
+                    <Text
+                      style={[
+                        styles.deviceInfoText,
+                        { color: '#FFD700', marginTop: 4 },
+                      ]}
+                    >
+                      Initializing local camera...
+                    </Text>
+                  )}
                 </View>
               )}
 
@@ -837,7 +991,7 @@ export default function SyncRecordingScreen() {
                         styles.recordButton,
                         !isCameraReady && styles.disabledButton,
                       ]}
-                      onPress={handleStartRecording}
+                      onPress={() => handleStartRecording()}
                       disabled={!isCameraReady}
                     >
                       <LinearGradient
@@ -851,7 +1005,7 @@ export default function SyncRecordingScreen() {
                         <Play size={24} color="#fff" />
                         <Text style={styles.recordButtonText}>
                           {!isCameraReady
-                            ? 'Preparing Camera...'
+                            ? 'Preparing Local Camera...'
                             : 'Start Sync Recording'}
                         </Text>
                       </LinearGradient>
@@ -859,7 +1013,7 @@ export default function SyncRecordingScreen() {
                   ) : (
                     <TouchableOpacity
                       style={styles.stopButton}
-                      onPress={handleStopRecording}
+                      onPress={() => handleStopRecording()}
                     >
                       <Square size={24} color="#fff" />
                       <Text style={styles.stopButtonText}>Stop Recording</Text>
@@ -885,7 +1039,7 @@ export default function SyncRecordingScreen() {
                 setSession(null);
                 setShouldShowCamera(false);
                 setIsCameraReady(false);
-                setCameraMode('picture');
+                setIsRecordingAttemptInProgress(false);
               }}
             >
               <ArrowLeft size={24} color="#fff" />
@@ -922,7 +1076,10 @@ export default function SyncRecordingScreen() {
               <Text style={styles.sessionTitle}>Session ID</Text>
               <View style={styles.sessionIdContainer}>
                 <Text style={styles.sessionIdDisplay}>{session.id}</Text>
-                <TouchableOpacity style={styles.copyButton}>
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={copySessionId}
+                >
                   <Copy size={16} color="#00D4FF" />
                 </TouchableOpacity>
               </View>
@@ -950,7 +1107,11 @@ export default function SyncRecordingScreen() {
 
   switch (sessionMode) {
     case 'join':
-      if (!session) return renderJoinMode();
+      // If we're joining and not yet in a session, show the join form
+      if (!session) {
+        return renderJoinMode();
+      }
+      // Once we have a session, show the session interface
       return renderSessionInterface();
     case 'host':
       return renderSessionInterface();
@@ -959,7 +1120,6 @@ export default function SyncRecordingScreen() {
   }
 }
 
-// [All the styles remain the same as the original file...]
 const styles = StyleSheet.create({
   container: {
     flex: 1,
