@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
-  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -24,12 +23,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 type CalibrationStep = 'positioning' | 'complete';
 
-type LineId =
-  | 'topBackWall'
-  | 'net'
-  | 'baseline'
-  | 'midCourt'
-  | 'verticalCenter';
+type LineId = 'topBackWall' | 'baseline' | 'verticalCenter';
 
 interface LinePosition {
   x: number;
@@ -43,7 +37,6 @@ export default function CalibrationScreen() {
   const [cameraReady, setCameraReady] = useState(false);
 
   const [step, setStep] = useState<CalibrationStep>('positioning');
-  const [draggedLineId, setDraggedLineId] = useState<LineId | null>(null);
   const [isAligned, setIsAligned] = useState(false);
 
   // Animations
@@ -60,12 +53,11 @@ export default function CalibrationScreen() {
   const initialHeight = Math.min(screenWidth, screenHeight);
 
   const [linePositions, setLinePositions] = useState<LinePosition[]>([
-    // Four horizontal lines evenly spaced from top to bottom (1/5, 2/5, 3/5, 4/5)
-    { id: 'topBackWall', x: initialWidth * 0.5, y: initialHeight * 0.2 },
-    { id: 'net', x: initialWidth * 0.5, y: initialHeight * 0.4 },
-    { id: 'midCourt', x: initialWidth * 0.5, y: initialHeight * 0.6 },
-    { id: 'baseline', x: initialWidth * 0.5, y: initialHeight * 0.8 },
-    // One vertical line perpendicular to the bottom (baseline) line
+    // Top line: 15% from top, centered horizontally
+    { id: 'topBackWall', x: initialWidth * 0.5, y: initialHeight * 0.15 },
+    // Bottom line: 25% from bottom (75% from top), centered horizontally
+    { id: 'baseline', x: initialWidth * 0.5, y: initialHeight * 0.75 },
+    // One vertical line: centered vertically (50% from top), centered horizontally (50% from left)
     { id: 'verticalCenter', x: initialWidth * 0.5, y: initialHeight * 0.5 },
   ]);
 
@@ -109,46 +101,45 @@ export default function CalibrationScreen() {
   useEffect(() => {
     const byId = (id: LineId) => linePositions.find((l) => l.id === id)!;
     const top = byId('topBackWall');
-    const net = byId('net');
-    const midCourt = byId('midCourt');
     const base = byId('baseline');
     const vertical = byId('verticalCenter');
 
     const height = initialHeight;
     const width = initialWidth;
 
-    // Order: top < net < midCourt < base
-    const hasValidOrder =
-      top.y < net.y && net.y < midCourt.y && midCourt.y < base.y;
+    // Order: top < base
+    const hasValidOrder = top.y < base.y;
 
-    // Even spacing check: distances between consecutive horizontals roughly equal
-    const d1 = net.y - top.y;
-    const d2 = midCourt.y - net.y;
-    const d3 = base.y - midCourt.y;
-    const avg = (d1 + d2 + d3) / 3;
-    const spacingEven = [d1, d2, d3].every(
-      (d) => Math.abs(d - avg) < height * 0.06
+    // Check that the distance between top and bottom lines is reasonable
+    const distance = base.y - top.y;
+    const reasonableDistance =
+      distance > height * 0.3 && distance < height * 0.8;
+
+    // Horizontal centering for horizontal lines
+    const centered = [top, base].every(
+      (l) => Math.abs(l.x - width * 0.5) < width * 0.08
     );
 
-    // Horizontal centering for all horizontals
-    const centered = [top, net, midCourt, base].every(
-      (l) => Math.abs(l.x - width * 0.5) < width * 0.06
-    );
+    // Bounds sanity - top line should be near top (15% from top)
+    const topNearTop = Math.abs(top.y - height * 0.15) < height * 0.05;
+    // Bottom line should be near bottom (25% from bottom = 75% from top)
+    const baseNearBottom = Math.abs(base.y - height * 0.75) < height * 0.05;
+    // Vertical line should be centered vertically (50% from top)
+    const verticalCentered =
+      Math.abs(vertical.y - height * 0.5) < height * 0.05;
 
-    // Bounds sanity
-    const topNearTop = top.y < height * 0.25;
-    const baseNearBottom = base.y > height * 0.7;
-
-    // Vertical line near center
-    const verticalCentered = Math.abs(vertical.x - width * 0.5) < width * 0.06;
+    // Vertical line should be centered horizontally (50% from left)
+    const verticalHorizontallyCentered =
+      Math.abs(vertical.x - width * 0.5) < width * 0.08;
 
     const aligned =
       hasValidOrder &&
-      spacingEven &&
+      reasonableDistance &&
       centered &&
       topNearTop &&
       baseNearBottom &&
-      verticalCentered;
+      verticalCentered &&
+      verticalHorizontallyCentered;
 
     setIsAligned(aligned);
 
@@ -160,35 +151,11 @@ export default function CalibrationScreen() {
     }
   }, [linePositions, initialHeight, initialWidth, fade, step]);
 
-  const createPanResponder = (lineId: LineId) =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => setDraggedLineId(lineId),
-      onPanResponderMove: (evt) => {
-        const { pageX, pageY } = evt.nativeEvent;
-        setLinePositions((prev) =>
-          prev.map((l) => (l.id === lineId ? { ...l, x: pageX, y: pageY } : l))
-        );
-      },
-      onPanResponderRelease: () => setDraggedLineId(null),
-      onPanResponderTerminate: () => setDraggedLineId(null),
-    });
-
-  const lineColors: Record<LineId, string> = {
-    topBackWall: '#9C27B0',
-    net: '#FF9800',
-    midCourt: '#FFEB3B',
-    baseline: '#F44336',
-    verticalCenter: '#2196F3',
-  };
-
-  const renderDraggableLines = () =>
+  const renderLines = () =>
     linePositions.map((line) => {
       const isVertical = line.id === 'verticalCenter';
-      const pan = createPanResponder(line.id);
-      const isDragging = draggedLineId === line.id;
-      const color = isAligned ? '#4CAF50' : lineColors[line.id];
+      // Lines are red by default, only turn green when perfectly aligned
+      const color = isAligned ? '#4CAF50' : '#FF0000';
 
       return (
         <View
@@ -200,15 +167,12 @@ export default function CalibrationScreen() {
               top: isVertical ? line.y - 75 : line.y - 20,
             },
           ]}
-          {...pan.panHandlers}
         >
           <View
             style={[
               isVertical ? styles.lineVertical : styles.lineHorizontal,
               {
                 backgroundColor: color,
-                opacity: isDragging ? 0.9 : 1,
-                transform: [{ scale: isDragging ? 1.12 : 1 }],
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.8)',
               },
@@ -230,14 +194,10 @@ export default function CalibrationScreen() {
     switch (id) {
       case 'topBackWall':
         return 'Top of Back Wall';
-      case 'net':
-        return 'Top of Net';
-      case 'midCourt':
-        return 'Middle-line';
       case 'baseline':
         return 'Near Baseline';
       case 'verticalCenter':
-        return 'Vertical Center';
+        return 'Middle';
       default:
         return '';
     }
@@ -290,8 +250,8 @@ export default function CalibrationScreen() {
         onMountError={(e) => console.error('Camera mount error', e)}
       />
 
-      {/* AR Draggable Guides */}
-      {renderDraggableLines()}
+      {/* AR Fixed Guides */}
+      {renderLines()}
 
       {/* Controls */}
       <View style={styles.controls}>
@@ -326,9 +286,16 @@ export default function CalibrationScreen() {
       {step === 'positioning' && (
         <Animated.View style={[styles.hintContainer, fadeStyle]}>
           <Text style={styles.hintText}>
-            Fit the court inside the colored guides. Drag lines if needed. They
-            turn green when aligned.
+            Fit the court inside the colored guides. They turn green when
+            aligned.
           </Text>
+        </Animated.View>
+      )}
+
+      {/* Success message when aligned */}
+      {isAligned && (
+        <Animated.View style={[styles.hintContainer, fadeStyle]}>
+          <Text style={styles.hintText}>You found the sweet spot!</Text>
         </Animated.View>
       )}
     </View>
@@ -366,7 +333,7 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   statusText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
 
-  // Draggable line containers
+  // Fixed line containers
   lineContainer: {
     position: 'absolute',
     width: 150,
