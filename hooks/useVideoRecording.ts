@@ -34,7 +34,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
   } = options;
 
   const cameraRef = useRef<CameraView>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout>();
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
@@ -150,8 +150,6 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
           if (cameraRef.current) {
             const recording = await cameraRef.current.recordAsync({
               maxDuration,
-              quality,
-              mute: false,
             });
 
             if (recording?.uri) {

@@ -58,7 +58,7 @@ export class VideoUtils {
         duration: assetInfo.duration || 0,
         width: assetInfo.width || 0,
         height: assetInfo.height || 0,
-        size: assetInfo.fileSize || 0,
+        size: 0, // fileSize not available in AssetInfo
         filename: assetInfo.filename || 'video.mp4'
       };
     } catch (error) {

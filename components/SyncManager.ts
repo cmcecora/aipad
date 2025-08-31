@@ -41,7 +41,7 @@ export class SyncManager {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private pingInterval: NodeJS.Timeout | null = null;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
   private serverUrl: string;
   private clockOffsetMs = 0; // server_time ≈ local_time - offset
   private latencyMs = 0;
@@ -242,7 +242,7 @@ export class SyncManager {
     console.log('Received sync message:', message);
 
     switch (message.type) {
-      case 'joined':
+      case 'device_connected':
         this.onConnectionChange?.('connected');
         this.onSessionUpdate?.({
           id: message.sessionId,

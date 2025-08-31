@@ -203,7 +203,7 @@ export default function AnalyticsScreen() {
                       style={[
                         styles.progressFill,
                         { 
-                          width: factor.value,
+                          width: factor.value as any,
                           backgroundColor: factor.color
                         }
                       ]}

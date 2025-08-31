@@ -63,6 +63,10 @@ export default function SyncRecordingScreen() {
   const cameraInitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const cameraIsRecordingRef = useRef<boolean>(false);
+  const pendingStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();

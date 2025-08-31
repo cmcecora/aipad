@@ -33,7 +33,7 @@ export default function VideoRecorder({
   const [recordingTime, setRecordingTime] = useState(0);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isRecording) {
       interval = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -111,8 +111,6 @@ export default function VideoRecorder({
 
       const recording = await cameraRef.current.recordAsync({
         maxDuration,
-        quality,
-        mute: false,
       });
 
       if (recording?.uri) {
@@ -195,11 +193,6 @@ export default function VideoRecorder({
         style={styles.camera}
         facing="back"
         mode="video"
-        onRecordingStatusChange={(status) => {
-          if (!status.isRecording && isRecording) {
-            setIsRecording(false);
-          }
-        }}
       />
 
       <View style={styles.overlay}>

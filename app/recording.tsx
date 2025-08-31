@@ -30,7 +30,7 @@ export default function RecordingScreen() {
   });
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isRecording && !isPaused) {
       interval = setInterval(() => {
         setRecordingTime(prev => prev + 1);
