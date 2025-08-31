@@ -406,7 +406,7 @@ export class AdvancedCourtLineDetector {
           lastErrorTime: Date.now()
         };
         
-        const errorHandling = ErrorHandler.handleError(error, errorContext);
+        const errorHandling = ErrorHandler.handleError(String(error), errorContext);
         errorInfo = errorHandling;
         
         // Try to recover with fallback parameters

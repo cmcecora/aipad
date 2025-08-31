@@ -105,7 +105,7 @@ export class ErrorHandler {
     newParams?: Partial<ProcessingParams>;
   } {
     const errorType = this.classifyError(error);
-    const strategy = this.RECOVERY_STRATEGIES[errorType];
+    const strategy = this.RECOVERY_STRATEGIES[errorType as keyof typeof this.RECOVERY_STRATEGIES] || this.RECOVERY_STRATEGIES.processing_timeout;
     
     // Log error for debugging
     this.logError(error, errorType, context);
@@ -321,7 +321,7 @@ export class ErrorHandler {
       [this.ERROR_TYPES.UNKNOWN_ERROR]: 'Something unexpected happened. The app will try to recover automatically.'
     };
     
-    return messages[errorType] || messages[this.ERROR_TYPES.UNKNOWN_ERROR];
+    return messages[errorType as keyof typeof messages] || messages[this.ERROR_TYPES.UNKNOWN_ERROR];
   }
   
   /**
@@ -362,7 +362,7 @@ export class ErrorHandler {
       ]
     };
     
-    return suggestions[errorType] || suggestions[this.ERROR_TYPES.UNKNOWN_ERROR];
+    return suggestions[errorType as keyof typeof suggestions] || suggestions[this.ERROR_TYPES.UNKNOWN_ERROR];
   }
   
   /**

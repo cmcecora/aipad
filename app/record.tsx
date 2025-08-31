@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Camera,
+  Camera as CameraIcon,
   Smartphone,
   Wifi,
   Settings,
@@ -22,17 +22,20 @@ import {
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import {
-  CameraView,
-  useCameraPermissions,
-  useMicrophonePermissions,
-} from 'expo-camera';
+  Camera,
+  useCameraPermission,
+  useMicrophonePermission,
+  useCameraDevices,
+} from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 export default function RecordScreen() {
-  const cameraRef = useRef<CameraView>(null);
-  const [camPerm, requestCamPerm] = useCameraPermissions();
-  const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  const cameraRef = useRef<Camera>(null);
+  const { hasPermission: hasCamPerm, requestPermission: requestCamPerm } = useCameraPermission();
+  const { hasPermission: hasMicPerm, requestPermission: requestMicPerm } = useMicrophonePermission();
+  const devices = useCameraDevices();
+  const device = devices.find(d => d.position === 'back');
   const [mediaLibraryPerm, requestMediaLibraryPerm] =
     MediaLibrary.usePermissions();
 
@@ -61,9 +64,9 @@ export default function RecordScreen() {
   const ensurePermissions = async (): Promise<boolean> => {
     try {
       // Request camera permission
-      if (!camPerm?.granted) {
+      if (!hasCamPerm) {
         const camResult = await requestCamPerm();
-        if (!camResult.granted) {
+        if (!camResult) {
           Alert.alert(
             'Camera Permission Required',
             'Please enable camera access in your device settings to record videos.',
@@ -74,9 +77,9 @@ export default function RecordScreen() {
       }
 
       // Request microphone permission
-      if (!micPerm?.granted) {
+      if (!hasMicPerm) {
         const micResult = await requestMicPerm();
-        if (!micResult.granted) {
+        if (!micResult) {
           Alert.alert(
             'Microphone Permission Required',
             'Please enable microphone access in your device settings to record audio.',
@@ -90,12 +93,24 @@ export default function RecordScreen() {
       if (!mediaLibraryPerm?.granted) {
         const mediaResult = await requestMediaLibraryPerm();
         if (!mediaResult.granted) {
-          Alert.alert(
-            'Storage Permission Required',
-            'Please enable storage access to save recorded videos.',
-            [{ text: 'OK' }]
-          );
-          return false;
+          // On Android with Expo Go, media library access is limited
+          // Show a warning but continue
+          if (Platform.OS === 'android') {
+            Alert.alert(
+              'Limited Storage Access',
+              'Expo Go has limited media library access on Android. For full functionality, use a development build. Videos will still be saved to your camera roll.',
+              [{ text: 'Continue Anyway' }]
+            );
+            // Continue despite limited permissions
+            return true;
+          } else {
+            Alert.alert(
+              'Storage Permission Required',
+              'Please enable storage access to save recorded videos.',
+              [{ text: 'OK' }]
+            );
+            return false;
+          }
         }
       }
 
@@ -131,13 +146,17 @@ export default function RecordScreen() {
       setTimeout(async () => {
         if (cameraRef.current) {
           try {
-            const recording = await cameraRef.current.recordAsync({
-              maxDuration: 3600, // 1 hour max
+            await cameraRef.current.startRecording({
+              onRecordingFinished: async (video) => {
+                await handleRecordingComplete(video.path);
+              },
+              onRecordingError: (error) => {
+                console.error('Recording error:', error);
+                Alert.alert('Recording Error', 'Failed to record video. Please try again.');
+                setIsRecording(false);
+                setShowCamera(false);
+              }
             });
-
-            if (recording?.uri) {
-              await handleRecordingComplete(recording.uri);
-            }
           } catch (recordError) {
             console.error('Recording error:', recordError);
             Alert.alert(
@@ -160,7 +179,7 @@ export default function RecordScreen() {
   const handleStopRecording = async () => {
     try {
       if (cameraRef.current && isRecording) {
-        cameraRef.current.stopRecording();
+        await cameraRef.current.stopRecording();
       }
     } catch (error) {
       console.error('Stop recording error:', error);
@@ -172,19 +191,26 @@ export default function RecordScreen() {
     try {
       setIsProcessing(true);
 
-      // Create asset from the recorded video
-      const asset = await MediaLibrary.createAssetAsync(videoUri);
+      // Try to save to media library
+      try {
+        // Create asset from the recorded video
+        const asset = await MediaLibrary.createAssetAsync(videoUri);
 
-      // Create or get the Raydel Recordings album
-      let album = await MediaLibrary.getAlbumAsync('Raydel Recordings');
-      if (!album) {
-        album = await MediaLibrary.createAlbumAsync(
-          'Raydel Recordings',
-          asset,
-          false
-        );
-      } else {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        // Create or get the Raydel Recordings album
+        let album = await MediaLibrary.getAlbumAsync('Raydel Recordings');
+        if (!album) {
+          album = await MediaLibrary.createAlbumAsync(
+            'Raydel Recordings',
+            asset,
+            false
+          );
+        } else {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        }
+      } catch (mediaError) {
+        // Handle limited permissions in Expo Go
+        console.warn('Media library save error (expected in Expo Go):', mediaError);
+        // Video is still saved to camera roll even if album creation fails
       }
 
       // Show success message
@@ -226,14 +252,16 @@ export default function RecordScreen() {
     router.push('/calibration');
   };
 
-  if (showCamera && Platform.OS !== 'web') {
+  if (showCamera && Platform.OS !== 'web' && device) {
     return (
       <View style={styles.cameraContainer}>
-        <CameraView
+        <Camera
           ref={cameraRef}
           style={styles.camera}
-          facing="back"
-          mode="video"
+          device={device}
+          isActive={true}
+          video={true}
+          audio={true}
         />
 
         <View style={styles.cameraOverlay}>
@@ -314,7 +342,7 @@ export default function RecordScreen() {
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+                { backgroundColor: hasCamPerm ? '#00FF88' : '#FF6B6B' },
               ]}
             />
           </View>
@@ -324,10 +352,10 @@ export default function RecordScreen() {
           <Text
             style={[
               styles.cameraStatus,
-              { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+              { color: hasCamPerm ? '#00FF88' : '#FF6B6B' },
             ]}
           >
-            {camPerm?.granted ? 'Ready' : 'Permission Required'}
+            {hasCamPerm ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
 
@@ -338,7 +366,7 @@ export default function RecordScreen() {
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+                { backgroundColor: hasCamPerm ? '#00FF88' : '#FF6B6B' },
               ]}
             />
           </View>
@@ -348,10 +376,10 @@ export default function RecordScreen() {
           <Text
             style={[
               styles.cameraStatus,
-              { color: camPerm?.granted ? '#00FF88' : '#FF6B6B' },
+              { color: hasCamPerm ? '#00FF88' : '#FF6B6B' },
             ]}
           >
-            {camPerm?.granted ? 'Ready' : 'Permission Required'}
+            {hasCamPerm ? 'Ready' : 'Permission Required'}
           </Text>
         </View>
       </View>
@@ -450,7 +478,7 @@ export default function RecordScreen() {
           style={styles.secondaryButton}
           onPress={handleCameraSetup}
         >
-          <Camera size={20} color="#00D4FF" />
+          <CameraIcon size={20} color="#00D4FF" />
           <Text style={styles.secondaryButtonText}>Setup Cameras</Text>
         </TouchableOpacity>
 

@@ -1,12 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import {
-  CameraView,
-  useCameraPermissions,
-  useMicrophonePermissions,
-} from 'expo-camera';
+  Camera,
+  useCameraPermission,
+  useMicrophonePermission,
+  useCameraDevices,
+} from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
-import { Play, Square, Camera } from 'lucide-react-native';
+import { Play, Square, Camera as CameraIcon } from 'lucide-react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 interface VideoRecorderProps {
@@ -22,9 +23,11 @@ export default function VideoRecorder({
   maxDuration = 3600,
   quality = '1080p',
 }: VideoRecorderProps) {
-  const cameraRef = useRef<CameraView>(null);
-  const [camPerm, requestCamPerm] = useCameraPermissions();
-  const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  const cameraRef = useRef<Camera>(null);
+  const { hasPermission: hasCamPerm, requestPermission: requestCamPerm } = useCameraPermission();
+  const { hasPermission: hasMicPerm, requestPermission: requestMicPerm } = useMicrophonePermission();
+  const devices = useCameraDevices();
+  const device = devices.find(d => d.position === 'back');
   const [mediaLibraryPerm, requestMediaLibraryPerm] =
     MediaLibrary.usePermissions();
 
@@ -63,18 +66,18 @@ export default function VideoRecorder({
   const requestAllPermissions = async (): Promise<boolean> => {
     try {
       // Request camera permission
-      if (!camPerm?.granted) {
+      if (!hasCamPerm) {
         const camResult = await requestCamPerm();
-        if (!camResult.granted) {
+        if (!camResult) {
           onError?.('Camera permission is required to record videos');
           return false;
         }
       }
 
       // Request microphone permission
-      if (!micPerm?.granted) {
+      if (!hasMicPerm) {
         const micResult = await requestMicPerm();
-        if (!micResult.granted) {
+        if (!micResult) {
           onError?.('Microphone permission is required to record audio');
           return false;
         }
@@ -109,13 +112,16 @@ export default function VideoRecorder({
 
       setIsRecording(true);
 
-      const recording = await cameraRef.current.recordAsync({
-        maxDuration,
+      await cameraRef.current.startRecording({
+        onRecordingFinished: async (video) => {
+          await saveVideoToGallery(video.path);
+        },
+        onRecordingError: (error) => {
+          console.error('Recording error:', error);
+          onError?.('Failed to record video');
+          setIsRecording(false);
+        }
       });
-
-      if (recording?.uri) {
-        await saveVideoToGallery(recording.uri);
-      }
     } catch (error) {
       console.error('Recording error:', error);
       onError?.('Failed to start recording');
@@ -126,7 +132,7 @@ export default function VideoRecorder({
   const stopRecording = async () => {
     try {
       if (cameraRef.current && isRecording) {
-        cameraRef.current.stopRecording();
+        await cameraRef.current.stopRecording();
       }
     } catch (error) {
       console.error('Stop recording error:', error);
@@ -168,10 +174,10 @@ export default function VideoRecorder({
       .padStart(2, '0')}`;
   };
 
-  if (!isInitialized && !camPerm?.granted) {
+  if (!isInitialized || !hasCamPerm || !device) {
     return (
       <View style={styles.permissionContainer}>
-        <Camera size={48} color="#00D4FF" />
+        <CameraIcon size={48} color="#00D4FF" />
         <Text style={styles.permissionTitle}>Camera Access Required</Text>
         <Text style={styles.permissionText}>
           Please grant camera and microphone permissions to record videos
@@ -188,11 +194,13 @@ export default function VideoRecorder({
 
   return (
     <View style={styles.container}>
-      <CameraView
+      <Camera
         ref={cameraRef}
         style={styles.camera}
-        facing="back"
-        mode="video"
+        device={device}
+        isActive={true}
+        video={true}
+        audio={true}
       />
 
       <View style={styles.overlay}>

@@ -110,7 +110,7 @@ export class RealTimeFrameProcessor {
           lastErrorTime: Date.now()
         };
         
-        const errorHandling = ErrorHandler.handleError(error, errorContext);
+        const errorHandling = ErrorHandler.handleError(String(error), errorContext);
         
         return {
           courtLines: [],

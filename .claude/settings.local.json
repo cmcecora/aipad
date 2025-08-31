@@ -10,7 +10,11 @@
       "Bash(npx expo start:*)",
       "Bash(mv:*)",
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint)",
+      "Bash(npx expo prebuild:*)",
+      "Bash(./gradlew:*)"
     ],
     "deny": []
   }

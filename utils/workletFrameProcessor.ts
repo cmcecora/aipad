@@ -1,5 +1,5 @@
 import type { Frame } from 'react-native-vision-camera';
-import type { DetectedLine, CourtLine } from '../types/computerVision';
+import type { DetectedLine, CourtLine, FrameData } from '../types/computerVision';
 
 /**
  * Worklet-based Frame Processor for Off-Main-Thread Processing
@@ -22,11 +22,25 @@ export class WorkletFrameProcessor {
     'worklet';
     
     try {
-      // Extract frame dimensions
+      // Extract frame dimensions and properties
       const width = frame.width;
       const height = frame.height;
+      const pixelFormat = frame.pixelFormat;
+      const timestamp = frame.timestamp;
       
-      // Create frame data for processing
+      // Validate frame
+      if (!frame.isValid) {
+        return {
+          success: false,
+          courtLines: [],
+          detectedLines: [],
+          processingTime: 0,
+          frameQuality: 0,
+          error: 'Frame is not valid'
+        };
+      }
+      
+      // Create frame data from real camera frame
       const frameData = this.createFrameDataFromVisionCamera(frame);
       
       // Process frame with computer vision algorithms
@@ -37,8 +51,11 @@ export class WorkletFrameProcessor {
         success: true,
         courtLines: result.courtLines,
         detectedLines: result.detectedLines,
-        processingTime: result.processingTime,
-        frameQuality: result.frameQuality,
+        performanceMetrics: {
+          processingTime: result.processingTime,
+          qualityLevel: result.frameQuality > 0.8 ? 'high' : 'medium',
+          frameTimestamp: timestamp
+        },
         error: null
       };
       
@@ -48,8 +65,11 @@ export class WorkletFrameProcessor {
         success: false,
         courtLines: [],
         detectedLines: [],
-        processingTime: 0,
-        frameQuality: 0,
+        performanceMetrics: {
+          processingTime: 0,
+          qualityLevel: 'low',
+          frameTimestamp: 0
+        },
         error: error instanceof Error ? error.message : 'Unknown worklet error'
       };
     }
@@ -57,57 +77,125 @@ export class WorkletFrameProcessor {
   
   /**
    * Create frame data from Vision Camera frame
-   * Note: This is a simplified version - in production, you'd extract actual pixel data
+   * This extracts real pixel data from the camera frame
    */
-  private static createFrameDataFromVisionCamera(frame: Frame) {
+  private static createFrameDataFromVisionCamera(frame: Frame): FrameData {
     'worklet';
     
     const width = frame.width;
     const height = frame.height;
+    const pixelFormat = frame.pixelFormat;
     
-    // For now, create a mock frame with test pattern
-    // In production, this would extract real pixel data from the frame
-    const data = new Uint8Array(width * height * 3);
+    // Get the actual pixel data from the frame
+    let data: Uint8Array;
     
-    // Create a test pattern that should trigger line detection
-    for (let i = 0; i < data.length; i += 3) {
-      const pixelIndex = i / 3;
-      const x = pixelIndex % width;
-      const y = Math.floor(pixelIndex / height);
+    try {
+      // Extract real pixel data from the frame
+      const arrayBuffer = frame.toArrayBuffer();
+      data = new Uint8Array(arrayBuffer);
       
-      // Create horizontal lines at specific positions (simulating court lines)
-      if (Math.abs(y - height * 0.15) < 3 || Math.abs(y - height * 0.75) < 3) {
-        data[i] = 255;     // R - bright white lines
-        data[i + 1] = 255; // G
-        data[i + 2] = 255; // B
+      // Validate data size
+      if (data.length === 0) {
+        throw new Error('Empty frame data');
       }
-      // Create vertical center line
-      else if (Math.abs(x - width * 0.5) < 3) {
-        data[i] = 255;     // R - bright white line
-        data[i + 1] = 255; // G
-        data[i + 2] = 255; // B
+      
+      // Convert different pixel formats to RGB if needed
+      if (pixelFormat === 'yuv') {
+        // Convert YUV to RGB (simplified conversion)
+        data = this.convertYUVtoRGB(data, width, height);
+      } else if (pixelFormat === 'rgb') {
+        // Data is already in RGB format
+        // Note: Vision Camera might return RGBA, so we need to handle that
+        if (data.length === width * height * 4) {
+          // RGBA format - extract RGB channels
+          data = this.extractRGBFromRGBA(data);
+        }
+      } else {
+        // Unknown format - create fallback data
+        console.warn('Unknown pixel format:', pixelFormat);
+        data = new Uint8Array(width * height * 3);
       }
-      // Background
-      else {
-        data[i] = 30;      // R - dark background
-        data[i + 1] = 30;  // G
-        data[i + 2] = 30;  // B
-      }
+      
+    } catch (error) {
+      console.error('Error extracting frame data:', error);
+      // Fallback to empty data
+      data = new Uint8Array(width * height * 3);
     }
     
     return {
       width,
       height,
       data,
+      format: 'rgb',
       timestamp: frame.timestamp
     };
+  }
+  
+  /**
+   * Convert YUV data to RGB
+   * This is a simplified YUV to RGB conversion
+   */
+  private static convertYUVtoRGB(yuvData: Uint8Array, width: number, height: number): Uint8Array {
+    'worklet';
+    
+    const rgbData = new Uint8Array(width * height * 3);
+    
+    // Simplified YUV to RGB conversion
+    // In production, you'd use a more accurate conversion algorithm
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        const yIndex = i * width + j;
+        const uIndex = width * height + (i / 2) * (width / 2) + (j / 2);
+        const vIndex = width * height + (width * height) / 4 + (i / 2) * (width / 2) + (j / 2);
+        
+        const y = yuvData[yIndex];
+        const u = yuvData[uIndex];
+        const v = yuvData[vIndex];
+        
+        // YUV to RGB conversion (simplified)
+        let r = y + 1.402 * (v - 128);
+        let g = y - 0.344136 * (u - 128) - 0.714136 * (v - 128);
+        let b = y + 1.772 * (u - 128);
+        
+        // Clamp values
+        r = Math.max(0, Math.min(255, r));
+        g = Math.max(0, Math.min(255, g));
+        b = Math.max(0, Math.min(255, b));
+        
+        const rgbIndex = (i * width + j) * 3;
+        rgbData[rgbIndex] = Math.round(r);
+        rgbData[rgbIndex + 1] = Math.round(g);
+        rgbData[rgbIndex + 2] = Math.round(b);
+      }
+    }
+    
+    return rgbData;
+  }
+  
+  /**
+   * Extract RGB channels from RGBA data
+   */
+  private static extractRGBFromRGBA(rgbaData: Uint8Array): Uint8Array {
+    'worklet';
+    
+    const rgbData = new Uint8Array((rgbaData.length / 4) * 3);
+    
+    for (let i = 0; i < rgbaData.length; i += 4) {
+      const rgbIndex = (i / 4) * 3;
+      rgbData[rgbIndex] = rgbaData[i];     // R
+      rgbData[rgbIndex + 1] = rgbaData[i + 1]; // G
+      rgbData[rgbIndex + 2] = rgbaData[i + 2]; // B
+      // Skip A channel
+    }
+    
+    return rgbData;
   }
   
   /**
    * Process frame with computer vision algorithms
    * This runs entirely within the worklet
    */
-  private static processFrameWithCV(frameData: any) {
+  private static processFrameWithCV(frameData: FrameData) {
     'worklet';
     
     const startTime = performance.now();
@@ -144,7 +232,7 @@ export class WorkletFrameProcessor {
   /**
    * Simulate court line detection (replace with real CV in production)
    */
-  private static simulateCourtLineDetection(frameData: any) {
+  private static simulateCourtLineDetection(frameData: FrameData) {
     'worklet';
     
     const { width, height } = frameData;
@@ -212,7 +300,7 @@ export class WorkletFrameProcessor {
   /**
    * Detect horizontal line at specific y-position
    */
-  private static detectHorizontalLine(frameData: any, targetY: number, tolerance: number) {
+  private static detectHorizontalLine(frameData: FrameData, targetY: number, tolerance: number) {
     'worklet';
     
     const { width, height, data } = frameData;
@@ -247,7 +335,7 @@ export class WorkletFrameProcessor {
   /**
    * Detect vertical line at specific x-position
    */
-  private static detectVerticalLine(frameData: any, targetX: number, tolerance: number) {
+  private static detectVerticalLine(frameData: FrameData, targetX: number, tolerance: number) {
     'worklet';
     
     const { width, height, data } = frameData;
@@ -282,7 +370,7 @@ export class WorkletFrameProcessor {
   /**
    * Calculate frame quality based on detected lines and image characteristics
    */
-  private static calculateFrameQuality(frameData: any, courtLines: any[]) {
+  private static calculateFrameQuality(frameData: FrameData, courtLines: any[]) {
     'worklet';
     
     const { width, height, data } = frameData;

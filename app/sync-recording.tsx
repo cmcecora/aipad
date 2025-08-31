@@ -25,10 +25,11 @@ import {
   Copy,
 } from 'lucide-react-native';
 import {
-  CameraView,
-  useCameraPermissions,
-  useMicrophonePermissions,
-} from 'expo-camera';
+  Camera,
+  useCameraPermission,
+  useMicrophonePermission,
+  useCameraDevices,
+} from 'react-native-vision-camera';
 import * as MediaLibrary from 'expo-media-library';
 
 interface SyncSession {
@@ -58,7 +59,7 @@ export default function SyncRecordingScreen() {
   const [networkLatency, setNetworkLatency] = useState(0);
   const [isPreWarming, setIsPreWarming] = useState(false);
 
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<Camera>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const connectionStatusRef = useRef<
@@ -68,8 +69,10 @@ export default function SyncRecordingScreen() {
   const timeSyncSamples = useRef<Array<{ offset: number; latency: number }>>([]);
   const recordingScheduled = useRef(false);
 
-  const [camPerm, requestCamPerm] = useCameraPermissions();
-  const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  const { hasPermission: hasCamPerm, requestPermission: requestCamPerm } = useCameraPermission();
+  const { hasPermission: hasMicPerm, requestPermission: requestMicPerm } = useMicrophonePermission();
+  const devices = useCameraDevices();
+  const device = devices.find(d => d.position === 'back');
   const [mediaLibraryPerm, requestMediaLibraryPerm] =
     MediaLibrary.usePermissions();
 
@@ -482,9 +485,9 @@ export default function SyncRecordingScreen() {
 
   const ensurePermissions = async (): Promise<boolean> => {
     try {
-      if (!camPerm?.granted) {
+      if (!hasCamPerm) {
         const camResult = await requestCamPerm();
-        if (!camResult.granted) {
+        if (!camResult) {
           Alert.alert(
             'Camera Permission Required',
             'Please enable camera access to record videos.'
@@ -493,9 +496,9 @@ export default function SyncRecordingScreen() {
         }
       }
 
-      if (!micPerm?.granted) {
+      if (!hasMicPerm) {
         const micResult = await requestMicPerm();
-        if (!micResult.granted) {
+        if (!micResult) {
           Alert.alert(
             'Microphone Permission Required',
             'Please enable microphone access to record audio.'
@@ -602,18 +605,21 @@ export default function SyncRecordingScreen() {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
-      console.log('[SYNC][RECORD] Starting recordAsync() - camera is pre-warmed');
-      const recording = await cameraRef.current.recordAsync({
-        maxDuration: 3600,
+      console.log('[SYNC][RECORD] Starting recording - camera is pre-warmed');
+      await cameraRef.current.startRecording({
+        onRecordingFinished: async (video) => {
+          console.log('[SYNC][RECORD] Recording finished. Path:', video.path);
+          await saveRecording(video.path);
+        },
+        onRecordingError: (error) => {
+          console.error('Recording error:', error);
+          Alert.alert('Recording Error', 'Failed to record video. Please try again.');
+          setIsRecording(false);
+          setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
+          recordingScheduled.current = false;
+          setCameraMode('picture');
+        }
       });
-
-      console.log(
-        '[SYNC][RECORD] recordAsync() resolved. URI:',
-        recording?.uri
-      );
-      if (recording?.uri) {
-        await saveRecording(recording.uri);
-      }
     } catch (error) {
       console.error('❌ Recording error:', error);
       Alert.alert(
@@ -889,15 +895,23 @@ export default function SyncRecordingScreen() {
           </LinearGradient>
 
           <View style={styles.cameraContainer}>
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing="back"
-              mode={cameraMode}
-              onCameraReady={() => {
-                console.log('📷 Camera ready callback, mode:', cameraMode);
-              }}
-            />
+            {device ? (
+              <Camera
+                ref={cameraRef}
+                style={styles.camera}
+                device={device}
+                isActive={true}
+                video={true}
+                audio={true}
+                onInitialized={() => {
+                  console.log('📷 Camera ready callback');
+                }}
+              />
+            ) : (
+              <View style={styles.camera}>
+                <Text style={{ color: 'white' }}>Camera not available</Text>
+              </View>
+            )}
 
             <View style={styles.cameraOverlay}>
               {isRecording && (
