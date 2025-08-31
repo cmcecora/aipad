@@ -1,419 +1,471 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Check, X, RotateCcw, Play } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  Platform,
+  PanResponder,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { router } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+type CalibrationStep = 'positioning' | 'complete';
+
+type LineId =
+  | 'topBackWall'
+  | 'net'
+  | 'baseline'
+  | 'midCourt'
+  | 'verticalCenter';
+
+interface LinePosition {
+  x: number;
+  y: number;
+  id: LineId;
+}
 
 export default function CalibrationScreen() {
-  const [calibrationStep, setCalibrationStep] = useState(0);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [primaryCameraAligned, setPrimaryCameraAligned] = useState(false);
-  const [secondaryCameraAligned, setSecondaryCameraAligned] = useState(false);
-  const [courtMapped, setCourtMapped] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [cameraReady, setCameraReady] = useState(false);
 
-  const calibrationSteps = [
-    'Position Primary Camera',
-    'Position Secondary Camera',
-    'Align Court Boundaries',
-    'Sync Cameras',
-    'Verify Setup'
-  ];
+  const [step, setStep] = useState<CalibrationStep>('positioning');
+  const [draggedLineId, setDraggedLineId] = useState<LineId | null>(null);
+  const [isAligned, setIsAligned] = useState(false);
 
-  const handleCalibrateStep = () => {
-    setIsCalibrating(true);
-    
-    setTimeout(() => {
-      setIsCalibrating(false);
-      
-      switch (calibrationStep) {
-        case 0:
-          setPrimaryCameraAligned(true);
-          break;
-        case 1:
-          setSecondaryCameraAligned(true);
-          break;
-        case 2:
-          setCourtMapped(true);
-          break;
-        case 3:
-          // Sync cameras
-          break;
-        case 4:
-          // Verification complete
-          break;
+  // Animations
+  const pulse = useSharedValue(1);
+  const fade = useSharedValue(1);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
+
+  // Initial line positions (landscape-friendly defaults)
+  const initialWidth = Math.max(screenWidth, screenHeight);
+  const initialHeight = Math.min(screenWidth, screenHeight);
+
+  const [linePositions, setLinePositions] = useState<LinePosition[]>([
+    // Four horizontal lines evenly spaced from top to bottom (1/5, 2/5, 3/5, 4/5)
+    { id: 'topBackWall', x: initialWidth * 0.5, y: initialHeight * 0.2 },
+    { id: 'net', x: initialWidth * 0.5, y: initialHeight * 0.4 },
+    { id: 'midCourt', x: initialWidth * 0.5, y: initialHeight * 0.6 },
+    { id: 'baseline', x: initialWidth * 0.5, y: initialHeight * 0.8 },
+    // One vertical line perpendicular to the bottom (baseline) line
+    { id: 'verticalCenter', x: initialWidth * 0.5, y: initialHeight * 0.5 },
+  ]);
+
+  useEffect(() => {
+    // Lock orientation to landscape for calibration
+    const lock = async () => {
+      try {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.LANDSCAPE
+        );
+      } catch (e) {
+        // no-op
       }
-      
-      if (calibrationStep < calibrationSteps.length - 1) {
-        setCalibrationStep(calibrationStep + 1);
-      }
-    }, 2000);
+    };
+    lock();
+    return () => {
+      ScreenOrientation.unlockAsync().catch(() => {});
+    };
+  }, []);
+
+  useEffect(() => {
+    // Request camera permission if needed
+    if (!permission?.granted && permission?.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
+
+  useEffect(() => {
+    // Subtle breathing animation for status indicator
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 900 }),
+        withTiming(1.0, { duration: 900 })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  // Simple geometric validation to auto-detect a "good" alignment
+  useEffect(() => {
+    const byId = (id: LineId) => linePositions.find((l) => l.id === id)!;
+    const top = byId('topBackWall');
+    const net = byId('net');
+    const midCourt = byId('midCourt');
+    const base = byId('baseline');
+    const vertical = byId('verticalCenter');
+
+    const height = initialHeight;
+    const width = initialWidth;
+
+    // Order: top < net < midCourt < base
+    const hasValidOrder =
+      top.y < net.y && net.y < midCourt.y && midCourt.y < base.y;
+
+    // Even spacing check: distances between consecutive horizontals roughly equal
+    const d1 = net.y - top.y;
+    const d2 = midCourt.y - net.y;
+    const d3 = base.y - midCourt.y;
+    const avg = (d1 + d2 + d3) / 3;
+    const spacingEven = [d1, d2, d3].every(
+      (d) => Math.abs(d - avg) < height * 0.06
+    );
+
+    // Horizontal centering for all horizontals
+    const centered = [top, net, midCourt, base].every(
+      (l) => Math.abs(l.x - width * 0.5) < width * 0.06
+    );
+
+    // Bounds sanity
+    const topNearTop = top.y < height * 0.25;
+    const baseNearBottom = base.y > height * 0.7;
+
+    // Vertical line near center
+    const verticalCentered = Math.abs(vertical.x - width * 0.5) < width * 0.06;
+
+    const aligned =
+      hasValidOrder &&
+      spacingEven &&
+      centered &&
+      topNearTop &&
+      baseNearBottom &&
+      verticalCentered;
+
+    setIsAligned(aligned);
+
+    if (aligned && step !== 'complete') {
+      fade.value = withTiming(1, { duration: 250 });
+      setStep('complete');
+    } else if (!aligned && step !== 'positioning') {
+      setStep('positioning');
+    }
+  }, [linePositions, initialHeight, initialWidth, fade, step]);
+
+  const createPanResponder = (lineId: LineId) =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => setDraggedLineId(lineId),
+      onPanResponderMove: (evt) => {
+        const { pageX, pageY } = evt.nativeEvent;
+        setLinePositions((prev) =>
+          prev.map((l) => (l.id === lineId ? { ...l, x: pageX, y: pageY } : l))
+        );
+      },
+      onPanResponderRelease: () => setDraggedLineId(null),
+      onPanResponderTerminate: () => setDraggedLineId(null),
+    });
+
+  const lineColors: Record<LineId, string> = {
+    topBackWall: '#9C27B0',
+    net: '#FF9800',
+    midCourt: '#FFEB3B',
+    baseline: '#F44336',
+    verticalCenter: '#2196F3',
   };
 
-  const handleStartRecording = () => {
-    if (calibrationStep === calibrationSteps.length - 1) {
-      router.push('/recording');
-    } else {
-      Alert.alert('Calibration Incomplete', 'Please complete all calibration steps first.');
+  const renderDraggableLines = () =>
+    linePositions.map((line) => {
+      const isVertical = line.id === 'verticalCenter';
+      const pan = createPanResponder(line.id);
+      const isDragging = draggedLineId === line.id;
+      const color = isAligned ? '#4CAF50' : lineColors[line.id];
+
+      return (
+        <View
+          key={line.id}
+          style={[
+            isVertical ? styles.lineContainerVertical : styles.lineContainer,
+            {
+              left: isVertical ? line.x - 20 : line.x - 75,
+              top: isVertical ? line.y - 75 : line.y - 20,
+            },
+          ]}
+          {...pan.panHandlers}
+        >
+          <View
+            style={[
+              isVertical ? styles.lineVertical : styles.lineHorizontal,
+              {
+                backgroundColor: color,
+                opacity: isDragging ? 0.9 : 1,
+                transform: [{ scale: isDragging ? 1.12 : 1 }],
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.8)',
+              },
+            ]}
+          />
+          <Text
+            style={[
+              isVertical ? styles.lineLabelVertical : styles.lineLabel,
+              { color },
+            ]}
+          >
+            {labelFor(line.id)}
+          </Text>
+        </View>
+      );
+    });
+
+  const labelFor = (id: LineId) => {
+    switch (id) {
+      case 'topBackWall':
+        return 'Top of Back Wall';
+      case 'net':
+        return 'Top of Net';
+      case 'midCourt':
+        return 'Middle-line';
+      case 'baseline':
+        return 'Near Baseline';
+      case 'verticalCenter':
+        return 'Vertical Center';
+      default:
+        return '';
     }
   };
 
-  const handleRecalibrate = () => {
-    setCalibrationStep(0);
-    setPrimaryCameraAligned(false);
-    setSecondaryCameraAligned(false);
-    setCourtMapped(false);
-  };
+  if (!permission) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>Loading camera permissions...</Text>
+      </View>
+    );
+  }
 
-  const getStepStatus = (stepIndex: number) => {
-    if (stepIndex < calibrationStep) return 'completed';
-    if (stepIndex === calibrationStep) return 'active';
-    return 'pending';
-  };
-
-  const getStepColor = (status: string) => {
-    switch (status) {
-      case 'completed': return '#00FF88';
-      case 'active': return '#00D4FF';
-      default: return '#666';
-    }
-  };
+  if (!permission.granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>
+          {permission.canAskAgain
+            ? 'Camera permission required for calibration'
+            : 'Camera permission denied. Please enable in settings.'}
+        </Text>
+        {permission.canAskAgain && (
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestPermission}
+          >
+            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[
+            styles.permissionButton,
+            { backgroundColor: '#666', marginTop: 10 },
+          ]}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.permissionButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#1a1a1a', '#2a2a2a']}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>Camera Calibration</Text>
-        <Text style={styles.headerSubtitle}>
-          Step {calibrationStep + 1} of {calibrationSteps.length}
-        </Text>
-      </LinearGradient>
+      <CameraView
+        ref={cameraRef}
+        style={styles.camera}
+        facing="back"
+        onCameraReady={() => setCameraReady(true)}
+        onMountError={(e) => console.error('Camera mount error', e)}
+      />
 
-      {/* Camera Preview Area */}
-      <View style={styles.previewContainer}>
-        <View style={styles.previewArea}>
-          <View style={styles.previewOverlay}>
-            <Text style={styles.previewText}>Live Camera Preview</Text>
-            <Text style={styles.previewSubtext}>
-              {calibrationSteps[calibrationStep]}
-            </Text>
-          </View>
-          
-          {/* Court Boundary Guides */}
-          <View style={styles.courtGuides}>
-            <View style={styles.courtBoundary} />
-            <View style={styles.netLine} />
-            <View style={styles.serviceLines} />
-          </View>
-        </View>
+      {/* AR Draggable Guides */}
+      {renderDraggableLines()}
 
-        {/* Calibration Status */}
-        <View style={styles.statusContainer}>
-          <View style={styles.statusItem}>
-            <View style={[styles.statusDot, { backgroundColor: primaryCameraAligned ? '#00FF88' : '#666' }]} />
-            <Text style={styles.statusText}>Primary Camera</Text>
-            {primaryCameraAligned && <Check size={16} color="#00FF88" />}
-          </View>
-          
-          <View style={styles.statusItem}>
-            <View style={[styles.statusDot, { backgroundColor: secondaryCameraAligned ? '#00FF88' : '#666' }]} />
-            <Text style={styles.statusText}>Secondary Camera</Text>
-            {secondaryCameraAligned && <Check size={16} color="#00FF88" />}
-          </View>
-          
-          <View style={styles.statusItem}>
-            <View style={[styles.statusDot, { backgroundColor: courtMapped ? '#00FF88' : '#666' }]} />
-            <Text style={styles.statusText}>Court Mapping</Text>
-            {courtMapped && <Check size={16} color="#00FF88" />}
-          </View>
-        </View>
-      </View>
-
-      {/* Progress Steps */}
-      <View style={styles.progressContainer}>
-        {calibrationSteps.map((step, index) => (
-          <View key={index} style={styles.progressStep}>
-            <View style={[
-              styles.progressDot,
-              { backgroundColor: getStepColor(getStepStatus(index)) }
-            ]}>
-              {getStepStatus(index) === 'completed' && (
-                <Check size={12} color="#000" />
-              )}
-              {getStepStatus(index) === 'active' && (
-                <Text style={styles.progressNumber}>{index + 1}</Text>
-              )}
-            </View>
-            <Text style={[
-              styles.progressText,
-              { color: getStepColor(getStepStatus(index)) }
-            ]}>
-              {step}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Instructions */}
-      <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionTitle}>
-          {calibrationSteps[calibrationStep]}
-        </Text>
-        <Text style={styles.instructionText}>
-          {getInstructionText(calibrationStep)}
-        </Text>
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={styles.secondaryButton}
-          onPress={handleRecalibrate}
+      {/* Controls */}
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
         >
-          <RotateCcw size={20} color="#00D4FF" />
-          <Text style={styles.secondaryButtonText}>Recalibrate</Text>
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
-
-        {calibrationStep < calibrationSteps.length - 1 ? (
-          <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={handleCalibrateStep}
-            disabled={isCalibrating}
-          >
-            <LinearGradient
-              colors={isCalibrating ? ['#333', '#333'] : ['#00D4FF', '#0099CC']}
-              style={styles.primaryButtonGradient}
-            >
-              <Camera size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>
-                {isCalibrating ? 'Calibrating...' : 'Calibrate'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={handleStartRecording}
-          >
-            <LinearGradient
-              colors={['#00FF88', '#00CC6A']}
-              style={styles.primaryButtonGradient}
-            >
-              <Play size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>Start Recording</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+        <View style={styles.statusPill}>
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: cameraReady ? '#00FF88' : '#FF6B6B' },
+            ]}
+          />
+          <Text style={styles.statusText}>
+            {cameraReady ? 'Camera ready' : 'Preparing camera...'}
+          </Text>
+        </View>
       </View>
+
+      {/* Perfect Position Indicator */}
+      {isAligned && (
+        <Animated.View style={[styles.perfectContainer, pulseStyle]}>
+          <Ionicons name="checkmark-circle" size={34} color="#4CAF50" />
+          <Text style={styles.perfectText}>Perfect position</Text>
+        </Animated.View>
+      )}
+
+      {/* Footer hint */}
+      {step === 'positioning' && (
+        <Animated.View style={[styles.hintContainer, fadeStyle]}>
+          <Text style={styles.hintText}>
+            Fit the court inside the colored guides. Drag lines if needed. They
+            turn green when aligned.
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 }
 
-function getInstructionText(step: number): string {
-  const instructions = [
-    'Mount your primary phone on the back wall. Ensure the entire court is visible in the frame.',
-    'Mount your secondary phone on the opposite back wall. The cameras should face each other.',
-    'Align the court boundaries with the on-screen guides. Tap the corners to set reference points.',
-    'Both cameras are now syncing. Keep them steady until synchronization is complete.',
-    'Calibration complete! Review the setup and start recording when ready.'
-  ];
-  return instructions[step];
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#888',
-    marginTop: 4,
-  },
-  previewContainer: {
-    flex: 1,
-    margin: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  previewArea: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    position: 'relative',
-  },
-  previewOverlay: {
+  container: { flex: 1, backgroundColor: '#000' },
+  camera: { flex: 1 },
+  controls: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1,
-  },
-  previewText: {
-    fontSize: 18,
-    color: '#fff',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  previewSubtext: {
-    fontSize: 14,
-    color: '#00D4FF',
-    textAlign: 'center',
-  },
-  courtGuides: {
-    position: 'absolute',
-    top: 20,
+    top: Platform.OS === 'ios' ? 50 : 30,
     left: 20,
     right: 20,
-    bottom: 20,
-  },
-  courtBoundary: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderWidth: 2,
-    borderColor: '#00D4FF',
-    borderRadius: 8,
-  },
-  netLine: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: '#00D4FF',
-    opacity: 0.8,
-  },
-  serviceLines: {
-    position: 'absolute',
-    top: '25%',
-    bottom: '25%',
-    left: '30%',
-    right: '30%',
-    borderWidth: 1,
-    borderColor: '#00D4FF',
-    opacity: 0.6,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 16,
-    backgroundColor: '#1a1a1a',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  statusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  progressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  progressStep: {
     alignItems: 'center',
-    flex: 1,
   },
-  progressDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
   },
-  progressNumber: {
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  statusText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+
+  // Draggable line containers
+  lineContainer: {
+    position: 'absolute',
+    width: 150,
+    height: 40,
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lineContainerVertical: {
+    position: 'absolute',
+    width: 40,
+    height: 150,
+    zIndex: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lineHorizontal: {
+    width: 120,
+    height: 4,
+    borderRadius: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  lineVertical: {
+    width: 4,
+    height: 120,
+    borderRadius: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  lineLabel: {
+    position: 'absolute',
+    top: -20,
     fontSize: 12,
-    color: '#000',
     fontWeight: 'bold',
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
-  progressText: {
-    fontSize: 10,
-    fontWeight: '600',
+  lineLabelVertical: {
+    position: 'absolute',
+    left: -50,
+    fontSize: 12,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    transform: [{ rotate: '-90deg' }],
+  },
+
+  perfectContainer: {
+    position: 'absolute',
+    top: 80,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  perfectText: { color: '#4CAF50', fontWeight: 'bold' },
+
+  hintContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: Platform.OS === 'ios' ? 40 : 24,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  hintText: { color: '#CCCCCC', fontSize: 14, textAlign: 'center' },
+
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
+  permissionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     textAlign: 'center',
+    marginBottom: 16,
   },
-  instructionsContainer: {
-    padding: 20,
+  permissionButton: {
+    backgroundColor: '#1976D2',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
-  instructionTitle: {
-    fontSize: 18,
-    color: '#fff',
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  instructionText: {
-    fontSize: 14,
-    color: '#888',
-    lineHeight: 20,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 12,
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#00D4FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryButtonText: {
-    color: '#00D4FF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  primaryButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  primaryButtonGradient: {
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  permissionButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });

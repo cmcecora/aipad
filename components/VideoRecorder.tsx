@@ -1,8 +1,13 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import {
+  CameraView,
+  useCameraPermissions,
+  useMicrophonePermissions,
+} from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Play, Square, Camera } from 'lucide-react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 interface VideoRecorderProps {
   onRecordingComplete?: (videoUri: string) => void;
@@ -15,13 +20,14 @@ export default function VideoRecorder({
   onRecordingComplete,
   onError,
   maxDuration = 3600,
-  quality = '1080p'
+  quality = '1080p',
 }: VideoRecorderProps) {
   const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
-  const [mediaLibraryPerm, requestMediaLibraryPerm] = MediaLibrary.usePermissions();
-  
+  const [mediaLibraryPerm, requestMediaLibraryPerm] =
+    MediaLibrary.usePermissions();
+
   const [isRecording, setIsRecording] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -30,13 +36,29 @@ export default function VideoRecorder({
     let interval: NodeJS.Timeout;
     if (isRecording) {
       interval = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime((prev) => prev + 1);
       }, 1000);
     } else {
       setRecordingTime(0);
     }
     return () => clearInterval(interval);
   }, [isRecording]);
+
+  useEffect(() => {
+    const lock = async () => {
+      try {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.LANDSCAPE
+        );
+      } catch (e) {
+        // no-op
+      }
+    };
+    lock();
+    return () => {
+      ScreenOrientation.unlockAsync().catch(() => {});
+    };
+  }, []);
 
   const requestAllPermissions = async (): Promise<boolean> => {
     try {
@@ -86,7 +108,7 @@ export default function VideoRecorder({
       }
 
       setIsRecording(true);
-      
+
       const recording = await cameraRef.current.recordAsync({
         maxDuration,
         quality,
@@ -118,11 +140,15 @@ export default function VideoRecorder({
     try {
       // Create asset from the recorded video
       const asset = await MediaLibrary.createAssetAsync(videoUri);
-      
+
       // Create or get the Raydel Recordings album
       let album = await MediaLibrary.getAlbumAsync('Raydel Recordings');
       if (!album) {
-        album = await MediaLibrary.createAlbumAsync('Raydel Recordings', asset, false);
+        album = await MediaLibrary.createAlbumAsync(
+          'Raydel Recordings',
+          asset,
+          false
+        );
       } else {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       }
@@ -139,7 +165,9 @@ export default function VideoRecorder({
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
   };
 
   if (!isInitialized && !camPerm?.granted) {
@@ -150,7 +178,10 @@ export default function VideoRecorder({
         <Text style={styles.permissionText}>
           Please grant camera and microphone permissions to record videos
         </Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestAllPermissions}>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={requestAllPermissions}
+        >
           <Text style={styles.permissionButtonText}>Grant Permissions</Text>
         </TouchableOpacity>
       </View>
@@ -170,13 +201,15 @@ export default function VideoRecorder({
           }
         }}
       />
-      
+
       <View style={styles.overlay}>
         {/* Recording indicator */}
         {isRecording && (
           <View style={styles.recordingIndicator}>
             <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>REC {formatTime(recordingTime)}</Text>
+            <Text style={styles.recordingText}>
+              REC {formatTime(recordingTime)}
+            </Text>
           </View>
         )}
 

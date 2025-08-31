@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import {
   useMicrophonePermissions,
 } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 export default function RecordScreen() {
   const cameraRef = useRef<CameraView>(null);
@@ -38,6 +39,24 @@ export default function RecordScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    if (showCamera) {
+      const lock = async () => {
+        try {
+          await ScreenOrientation.lockAsync(
+            ScreenOrientation.OrientationLock.LANDSCAPE
+          );
+        } catch (e) {
+          // no-op
+        }
+      };
+      lock();
+      return () => {
+        ScreenOrientation.unlockAsync().catch(() => {});
+      };
+    }
+  }, [showCamera]);
 
   const ensurePermissions = async (): Promise<boolean> => {
     try {
