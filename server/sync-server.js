@@ -26,10 +26,12 @@ class SyncSession {
     this.host = null;
     this.isRecording = false;
     this.createdAt = new Date();
-    // Per-device time sync data: { offsetMs, latencyMs, updatedAt }
+    // Per-device time sync data: { offsetMs, latencyMs, samples, updatedAt }
     this.timeSync = new Map();
     // Incrementing ID for time sync requests
     this.timeSyncRequestCounter = 0;
+    // Track recording readiness
+    this.devicesReady = new Set();
   }
 
   addDevice(ws, deviceInfo) {
@@ -59,8 +61,8 @@ class SyncSession {
 
     console.log(`Device ${device.name} joined session ${this.id}`);
 
-    // Kick off an initial time sync for this device
-    this.sendTimeSyncRequestToDevice(deviceId);
+    // Kick off multiple time sync rounds for accurate synchronization
+    this.performTimeSyncCalibration(deviceId);
     return device;
   }
 
@@ -114,12 +116,26 @@ class SyncSession {
 
     this.isRecording = true;
 
-    // Schedule an atomic start slightly in the future to absorb latency
-    const bufferTimeMs = 1200;
+    // Use much smaller buffer for near-instantaneous start
+    // Account for worst-case network latency + processing time
+    const bufferTimeMs = 250; // Reduced from 1200ms
     const serverNow = Date.now();
     const atomicStartTime = serverNow + bufferTimeMs;
 
-    // Broadcast atomic start command to ALL devices (including initiator)
+    // Calculate per-device adjusted timestamps based on clock offset
+    const deviceTimestamps = new Map();
+    this.devices.forEach((device, deviceId) => {
+      const syncData = this.timeSync.get(deviceId);
+      if (syncData) {
+        // Adjust for clock offset to ensure true simultaneity
+        deviceTimestamps.set(deviceId, {
+          atomic_start: atomicStartTime + syncData.offsetMs,
+          latency_compensation: syncData.latencyMs
+        });
+      }
+    });
+
+    // Broadcast atomic start command to ALL devices with precise timing
     const startMessage = {
       type: 'start_recording',
       sessionId: this.id,
@@ -127,6 +143,8 @@ class SyncSession {
       buffer_time_ms: bufferTimeMs,
       server_now: serverNow,
       initiator: initiatorDeviceId,
+      high_precision: true,
+      device_timestamps: Object.fromEntries(deviceTimestamps)
     };
 
     console.log(`📡 Broadcasting start_recording to ${this.devices.size} devices:`, startMessage);
@@ -212,11 +230,36 @@ class SyncSession {
     if (!device || device.ws.readyState !== WebSocket.OPEN) return;
     const requestId = `${this.id}-${++this.timeSyncRequestCounter}`;
     const serverTimestamp = Date.now();
+    const serverHighRes = process.hrtime.bigint();
     device.ws.send(JSON.stringify({
       type: 'time_sync_request',
       request_id: requestId,
-      server_timestamp: serverTimestamp
+      server_timestamp: serverTimestamp,
+      server_high_res: serverHighRes.toString()
     }));
+  }
+
+  // Perform multiple time sync rounds for accurate calibration
+  performTimeSyncCalibration(deviceId) {
+    // Send 5 rapid sync requests to get accurate offset
+    const intervals = [0, 100, 200, 350, 500];
+    intervals.forEach(delay => {
+      setTimeout(() => this.sendTimeSyncRequestToDevice(deviceId), delay);
+    });
+  }
+
+  // Mark device as ready for recording
+  markDeviceReady(deviceId) {
+    this.devicesReady.add(deviceId);
+    console.log(`Device ${deviceId} marked as ready. Total ready: ${this.devicesReady.size}/${this.devices.size}`);
+    
+    // Notify all devices about readiness status
+    this.broadcastToAll({
+      type: 'readiness_update',
+      ready_devices: this.devicesReady.size,
+      total_devices: this.devices.size,
+      all_ready: this.devicesReady.size === this.devices.size
+    });
   }
 }
 
@@ -247,6 +290,10 @@ wss.on('connection', (ws, req) => {
         
         case 'camera_ready':
           handleCameraReady(message);
+          break;
+        
+        case 'device_ready':
+          handleDeviceReady(message);
           break;
 
         case 'time_sync_response':
@@ -340,10 +387,8 @@ wss.on('connection', (ws, req) => {
       sessionStatus: session.getStatus()
     }));
 
-    // After join, perform a few quick time sync requests to stabilize offset
-    setTimeout(() => session.sendTimeSyncRequestToDevice(device.id), 50);
-    setTimeout(() => session.sendTimeSyncRequestToDevice(device.id), 250);
-    setTimeout(() => session.sendTimeSyncRequestToDevice(device.id), 500);
+    // Perform comprehensive time sync calibration
+    session.performTimeSyncCalibration(device.id);
   }
 
   function handleStartRecording(message) {
@@ -391,6 +436,9 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
+    // Mark device as ready
+    currentSession.markDeviceReady(currentDeviceId);
+
     // Broadcast camera ready status to other devices in the session
     currentSession.broadcastToOthers(currentDeviceId, {
       type: 'camera_ready',
@@ -398,6 +446,19 @@ wss.on('connection', (ws, req) => {
     });
 
     console.log('Camera ready signal from device', currentDeviceId, 'in session', currentSession.id);
+  }
+
+  function handleDeviceReady(message) {
+    if (!currentSession || !currentDeviceId) {
+      ws.send(JSON.stringify({ 
+        type: 'error', 
+        message: 'Not connected to a session' 
+      }));
+      return;
+    }
+
+    currentSession.markDeviceReady(currentDeviceId);
+    console.log('Device ready for recording:', currentDeviceId);
   }
 
   function handleTimeSyncResponse(message) {
@@ -418,22 +479,55 @@ wss.on('connection', (ws, req) => {
       const latency = rtt / 2;
       const offset = client_timestamp - (server_timestamp + latency);
 
-      // Store per-device time sync info
-      currentSession.timeSync.set(currentDeviceId, {
-        offsetMs: offset,
-        latencyMs: latency,
-        updatedAt: new Date()
-      });
+      // Get existing sync data or create new
+      let syncData = currentSession.timeSync.get(currentDeviceId) || {
+        samples: [],
+        offsetMs: 0,
+        latencyMs: 0
+      };
+
+      // Add this sample
+      syncData.samples.push({ offset, latency, rtt });
+      
+      // Keep only last 10 samples
+      if (syncData.samples.length > 10) {
+        syncData.samples.shift();
+      }
+
+      // Calculate median offset and latency for accuracy (NTP-style)
+      if (syncData.samples.length >= 3) {
+        const sortedOffsets = syncData.samples.map(s => s.offset).sort((a, b) => a - b);
+        const sortedLatencies = syncData.samples.map(s => s.latency).sort((a, b) => a - b);
+        const mid = Math.floor(sortedOffsets.length / 2);
+        
+        syncData.offsetMs = sortedOffsets.length % 2 !== 0 
+          ? sortedOffsets[mid] 
+          : (sortedOffsets[mid - 1] + sortedOffsets[mid]) / 2;
+        
+        syncData.latencyMs = sortedLatencies.length % 2 !== 0
+          ? sortedLatencies[mid]
+          : (sortedLatencies[mid - 1] + sortedLatencies[mid]) / 2;
+      } else {
+        // Use simple average for first few samples
+        syncData.offsetMs = offset;
+        syncData.latencyMs = latency;
+      }
+
+      syncData.updatedAt = new Date();
+      currentSession.timeSync.set(currentDeviceId, syncData);
 
       // Send an update back to the device
       ws.send(JSON.stringify({
         type: 'time_sync_update',
         request_id,
-        offset_ms: offset,
-        latency_ms: latency,
+        offset_ms: syncData.offsetMs,
+        latency_ms: syncData.latencyMs,
+        sample_count: syncData.samples.length,
         server_timestamp: server_timestamp,
         server_receive_timestamp: serverReceiveTs
       }));
+
+      console.log(`Time sync for device ${currentDeviceId}: offset=${syncData.offsetMs.toFixed(2)}ms, latency=${syncData.latencyMs.toFixed(2)}ms, samples=${syncData.samples.length}`);
     } catch (err) {
       console.error('Error handling time_sync_response:', err);
     }

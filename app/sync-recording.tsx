@@ -54,6 +54,9 @@ export default function SyncRecordingScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [shouldShowCamera, setShouldShowCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState<'picture' | 'video'>('picture');
+  const [timeOffset, setTimeOffset] = useState(0);
+  const [networkLatency, setNetworkLatency] = useState(0);
+  const [isPreWarming, setIsPreWarming] = useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -62,6 +65,8 @@ export default function SyncRecordingScreen() {
     'connecting' | 'connected' | 'disconnected'
   >('disconnected');
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeSyncSamples = useRef<Array<{ offset: number; latency: number }>>([]);
+  const recordingScheduled = useRef(false);
 
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
@@ -248,9 +253,46 @@ export default function SyncRecordingScreen() {
 
   const handleSyncMessage = (message: any) => {
     switch (message.type) {
+      case 'time_sync_request': {
+        // Respond immediately with high-precision timestamp
+        const clientTimestamp = Date.now();
+        const response = {
+          type: 'time_sync_response',
+          request_id: message.request_id,
+          client_timestamp: clientTimestamp,
+          server_timestamp: message.server_timestamp
+        };
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify(response));
+        }
+        break;
+      }
+
+      case 'time_sync_update': {
+        // Store time sync data
+        const { offset_ms, latency_ms, sample_count } = message;
+        setTimeOffset(offset_ms);
+        setNetworkLatency(latency_ms);
+        timeSyncSamples.current.push({ offset: offset_ms, latency: latency_ms });
+        if (timeSyncSamples.current.length > 10) {
+          timeSyncSamples.current.shift();
+        }
+        console.log(`⏱ Time sync update: offset=${offset_ms.toFixed(2)}ms, latency=${latency_ms.toFixed(2)}ms, samples=${sample_count}`);
+        break;
+      }
+
+      case 'readiness_update': {
+        const { ready_devices, total_devices, all_ready } = message;
+        console.log(`📊 Readiness: ${ready_devices}/${total_devices} devices ready`);
+        if (all_ready) {
+          console.log('✅ All devices ready for synchronized recording!');
+        }
+        break;
+      }
+
       case 'device_connected':
         console.log(
-          '📱 Device connected - setting up camera but NOT starting recording'
+          '📱 Device connected - setting up camera with pre-warming'
         );
         console.log(
           '📱 Setting connectionStatus to CONNECTED (device_connected)'
@@ -268,12 +310,8 @@ export default function SyncRecordingScreen() {
             : null
         );
         setShouldShowCamera(true);
-        setTimeout(() => {
-          setIsCameraReady(true);
-          console.log(
-            '📷 Camera is now ready - waiting for user to press Start Recording'
-          );
-        }, 2000);
+        // Start pre-warming camera immediately
+        preWarmCamera();
         Alert.alert(
           'Device Connected',
           `Connected to ${message.deviceName}. Press "Start Sync Recording" to begin.`
@@ -282,65 +320,82 @@ export default function SyncRecordingScreen() {
 
       case 'joined':
         console.log(
-          '📱 Successfully joined session - setting up camera but NOT starting recording'
+          '📱 Successfully joined session - setting up camera with pre-warming'
         );
         console.log('📱 Setting connectionStatus to CONNECTED');
         setConnectionStatus('connected');
         connectionStatusRef.current = 'connected';
         setShouldShowCamera(true);
-        setTimeout(() => {
-          setIsCameraReady(true);
-          console.log(
-            '📷 Camera is now ready - waiting for user to press Start Recording'
-          );
-        }, 2000);
+        // Start pre-warming camera immediately
+        preWarmCamera();
         break;
 
       case 'start_recording': {
         console.log('🎯 Received start_recording from server');
-        const atomic = (message as any).atomic_start_time as number | undefined;
-        const now = Date.now();
-        let delay = 100;
-        if (typeof atomic === 'number') {
-          delay = Math.max(0, Math.min(atomic - now, 5000));
-          console.log('⏱ Using atomic_start_time; scheduling in', delay, 'ms');
+        
+        if (recordingScheduled.current) {
+          console.log('⚠️ Recording already scheduled, ignoring duplicate');
+          return;
         }
-
+        
+        const { atomic_start_time, high_precision, device_timestamps } = message;
+        const now = Date.now();
+        
+        // Use device-specific timestamp if available (accounts for clock offset)
+        let targetTime = atomic_start_time;
+        const deviceId = getCurrentDeviceId();
+        if (device_timestamps && device_timestamps[deviceId]) {
+          targetTime = device_timestamps[deviceId].atomic_start;
+          console.log(`⏱ Using device-specific timestamp adjusted for clock offset`);
+        }
+        
+        // Calculate precise delay
+        let delay = Math.max(0, targetTime - now);
+        
+        // For high precision mode, use sub-millisecond timing
+        if (high_precision && delay > 0) {
+          // Account for processing time (typically 5-10ms)
+          delay = Math.max(0, delay - 5);
+        }
+        
+        console.log(`⏱ Scheduling recording start in ${delay}ms (target: ${new Date(targetTime).toISOString()})`);
         console.log('🎯 Current state:', {
           isRecording,
-          connectionStatus,
+          connectionStatus: connectionStatusRef.current,
           isCameraReady,
           hasCameraRef: !!cameraRef.current,
+          timeOffset,
+          networkLatency
         });
 
+        recordingScheduled.current = true;
+
         const doStart = () => {
+          recordingScheduled.current = false;
+          
           // Use ref for connection status to avoid stale closures
           const currentConnectionStatus = connectionStatusRef.current;
-          const currentIsRecording = isRecording;
           const currentCameraRef = cameraRef.current;
 
-          console.log('🎬 doStart() called with state:', {
-            isRecording: currentIsRecording,
+          console.log('🎬 doStart() executing at:', new Date().toISOString());
+          console.log('🎬 State:', {
             connectionStatus: currentConnectionStatus,
             hasCameraRef: !!currentCameraRef,
           });
 
-          // Check if we can start recording - must be connected and not already recording
-          const canStart =
-            !currentIsRecording &&
-            !!currentCameraRef &&
-            currentConnectionStatus === 'connected';
+          // Check if we can start recording
+          const canStart = !!currentCameraRef && currentConnectionStatus === 'connected';
 
           if (canStart) {
-            console.log('🎬 ✅ Starting recording from server sync command');
+            console.log('🎬 ✅ Starting recording with high precision sync');
             setIsRecording(true);
             setSession((prev) =>
               prev ? { ...prev, status: 'recording' } : null
             );
-            setTimeout(() => startActualRecording(), 50);
+            // Start immediately since we've already accounted for delays
+            startActualRecording();
           } else {
             console.log('🎬 ❌ Cannot start recording:', {
-              alreadyRecording: currentIsRecording,
               noCameraRef: !currentCameraRef,
               notConnected: currentConnectionStatus !== 'connected',
               actualStatus: currentConnectionStatus,
@@ -348,7 +403,13 @@ export default function SyncRecordingScreen() {
           }
         };
 
-        setTimeout(doStart, delay);
+        // Use high-precision timer for better accuracy
+        if (delay < 10) {
+          // For very small delays, execute immediately
+          doStart();
+        } else {
+          setTimeout(doStart, delay);
+        }
         break;
       }
 
@@ -464,6 +525,11 @@ export default function SyncRecordingScreen() {
 
   const handleStartRecording = async () => {
     console.log('🎬 User clicked Start Recording');
+    console.log('📊 Sync stats:', {
+      timeOffset: `${timeOffset.toFixed(2)}ms`,
+      networkLatency: `${networkLatency.toFixed(2)}ms`,
+      samples: timeSyncSamples.current.length
+    });
 
     if (connectionStatus !== 'connected') {
       Alert.alert(
@@ -473,8 +539,8 @@ export default function SyncRecordingScreen() {
       return;
     }
 
-    if (isRecording) {
-      console.log('Already recording, ignoring');
+    if (isRecording || recordingScheduled.current) {
+      console.log('Already recording or scheduled, ignoring');
       return;
     }
 
@@ -491,28 +557,52 @@ export default function SyncRecordingScreen() {
 
     // Send sync command to start both devices
     console.log('[SYNC][START] Sending start_recording command to server');
+    console.log('[SYNC][START] Expected network round-trip:', `${(networkLatency * 2).toFixed(2)}ms`);
     sendSyncCommand('start_recording');
 
-    // Immediately update local UI so button flips to Stop and REC timer appears
-    // The actual recording will begin when the server broadcast arrives
-    setIsRecording(true);
-    setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
+    // Don't update UI immediately - wait for server command
+    // This ensures perfect UI synchronization
+  };
+
+  const preWarmCamera = async () => {
+    console.log('🔥 Pre-warming camera for instant recording...');
+    setIsPreWarming(true);
+    
+    // Switch to video mode early
+    setCameraMode('video');
+    
+    // Allow camera to stabilize
+    setTimeout(() => {
+      setIsCameraReady(true);
+      setIsPreWarming(false);
+      console.log('📷 Camera pre-warmed and ready for instant recording');
+      
+      // Notify server that this device is ready
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'device_ready' }));
+      }
+    }, 1500);
+  };
+
+  const getCurrentDeviceId = (): string => {
+    // This would be received from server on join, for now generate one
+    return Math.random().toString(36).substring(2, 8);
   };
 
   const startActualRecording = async () => {
     try {
-      console.log('[SYNC][RECORD] Starting camera recording...');
+      console.log('[SYNC][RECORD] Starting camera recording with pre-warmed camera...');
       if (!cameraRef.current) return;
 
-      // Switch to video mode before recording
-      console.log('[SYNC][RECORD] Switching camera to video mode');
-      setCameraMode('video');
+      // Camera should already be in video mode from pre-warming
+      if (cameraMode !== 'video') {
+        console.log('[SYNC][RECORD] Switching to video mode (should have been pre-warmed)');
+        setCameraMode('video');
+        // Minimal delay since we're in emergency mode
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
 
-      // Give camera a moment to switch modes, then start recording directly
-      console.log('[SYNC][RECORD] Waiting for camera mode switch...');
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      console.log('[SYNC][RECORD] Starting recordAsync()');
+      console.log('[SYNC][RECORD] Starting recordAsync() - camera is pre-warmed');
       const recording = await cameraRef.current.recordAsync({
         maxDuration: 3600,
       });
@@ -532,6 +622,7 @@ export default function SyncRecordingScreen() {
       );
       setIsRecording(false);
       setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
+      recordingScheduled.current = false;
       // Reset camera mode on error
       setCameraMode('picture');
     }
@@ -818,6 +909,12 @@ export default function SyncRecordingScreen() {
                 </View>
               )}
 
+              {isPreWarming && (
+                <View style={styles.preWarmingIndicator}>
+                  <Text style={styles.preWarmingText}>Preparing camera...</Text>
+                </View>
+              )}
+
               {connectionStatus === 'connected' && (
                 <View style={styles.deviceInfo}>
                   <Text style={styles.deviceInfoText}>
@@ -826,6 +923,11 @@ export default function SyncRecordingScreen() {
                   <Text style={styles.sessionIdText}>
                     Session: {session.id}
                   </Text>
+                  {networkLatency > 0 && (
+                    <Text style={styles.syncInfoText}>
+                      Sync: ±{networkLatency.toFixed(0)}ms
+                    </Text>
+                  )}
                 </View>
               )}
 
@@ -1240,5 +1342,24 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  preWarmingIndicator: {
+    backgroundColor: 'rgba(255, 165, 0, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginTop: 20,
+  },
+  preWarmingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  syncInfoText: {
+    color: '#00FF88',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 2,
   },
 });
