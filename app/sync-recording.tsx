@@ -68,6 +68,7 @@ export default function SyncRecordingScreen() {
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeSyncSamples = useRef<Array<{ offset: number; latency: number }>>([]);
   const recordingScheduled = useRef(false);
+  const serverStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { hasPermission: hasCamPerm, requestPermission: requestCamPerm } = useCameraPermission();
   const { hasPermission: hasMicPerm, requestPermission: requestMicPerm } = useMicrophonePermission();
@@ -87,6 +88,10 @@ export default function SyncRecordingScreen() {
       }
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
+      }
+      if (serverStartTimeoutRef.current) {
+        clearTimeout(serverStartTimeoutRef.current);
+        serverStartTimeoutRef.current = null;
       }
     };
   }, []);
@@ -335,6 +340,11 @@ export default function SyncRecordingScreen() {
 
       case 'start_recording': {
         console.log('🎯 Received start_recording from server');
+        // Cancel any local fallback start if server broadcast arrived
+        if (serverStartTimeoutRef.current) {
+          clearTimeout(serverStartTimeoutRef.current);
+          serverStartTimeoutRef.current = null;
+        }
         
         if (recordingScheduled.current) {
           console.log('⚠️ Recording already scheduled, ignoring duplicate');
@@ -387,7 +397,7 @@ export default function SyncRecordingScreen() {
           });
 
           // Check if we can start recording
-          const canStart = !!currentCameraRef && currentConnectionStatus === 'connected';
+          const canStart = !!currentCameraRef && currentConnectionStatus === 'connected' && !isRecording;
 
           if (canStart) {
             console.log('🎬 ✅ Starting recording with high precision sync');
@@ -402,6 +412,7 @@ export default function SyncRecordingScreen() {
               noCameraRef: !currentCameraRef,
               notConnected: currentConnectionStatus !== 'connected',
               actualStatus: currentConnectionStatus,
+              alreadyRecording: isRecording,
             });
           }
         };
@@ -563,8 +574,28 @@ export default function SyncRecordingScreen() {
     console.log('[SYNC][START] Expected network round-trip:', `${(networkLatency * 2).toFixed(2)}ms`);
     sendSyncCommand('start_recording');
 
-    // Don't update UI immediately - wait for server command
-    // This ensures perfect UI synchronization
+    // Fallback: If server broadcast is delayed/missed, start locally after a short timeout
+    if (serverStartTimeoutRef.current) {
+      clearTimeout(serverStartTimeoutRef.current);
+    }
+    serverStartTimeoutRef.current = setTimeout(() => {
+      if (!isRecording && !recordingScheduled.current) {
+        const currentCameraRef = cameraRef.current;
+        const currentConnectionStatus = connectionStatusRef.current;
+        if (currentCameraRef && currentConnectionStatus === 'connected' && isCameraReady) {
+          console.log('⏱️ Fallback start: server did not broadcast in time');
+          setIsRecording(true);
+          setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
+          startActualRecording();
+        } else {
+          console.warn('⏱️ Fallback start skipped: not ready', {
+            hasCameraRef: !!currentCameraRef,
+            status: currentConnectionStatus,
+            isCameraReady,
+          });
+        }
+      }
+    }, 1500);
   };
 
   const preWarmCamera = async () => {
@@ -606,20 +637,25 @@ export default function SyncRecordingScreen() {
       }
 
       console.log('[SYNC][RECORD] Starting recording - camera is pre-warmed');
-      await cameraRef.current.startRecording({
-        onRecordingFinished: async (video) => {
+      const recOptions: any = {
+        onRecordingFinished: async (video: any) => {
           console.log('[SYNC][RECORD] Recording finished. Path:', video.path);
           await saveRecording(video.path);
         },
-        onRecordingError: (error) => {
+        onRecordingError: (error: any) => {
           console.error('Recording error:', error);
           Alert.alert('Recording Error', 'Failed to record video. Please try again.');
           setIsRecording(false);
           setSession((prev) => (prev ? { ...prev, status: 'connected' } : null));
           recordingScheduled.current = false;
           setCameraMode('picture');
-        }
-      });
+        },
+      };
+      if (Platform.OS === 'ios') {
+        // Ensure .mp4 container on iOS; Android defaults to MP4
+        recOptions.fileType = 'mp4';
+      }
+      await cameraRef.current.startRecording(recOptions);
     } catch (error) {
       console.error('❌ Recording error:', error);
       Alert.alert(
@@ -639,6 +675,15 @@ export default function SyncRecordingScreen() {
 
     if (!isRecording) return;
 
+    // Stop local camera immediately so file is finalized
+    try {
+      if (cameraRef.current) {
+        cameraRef.current.stopRecording();
+      }
+    } catch (e) {
+      console.warn('stopRecording threw (safe to ignore if already stopped):', e);
+    }
+
     // Send sync command to stop both devices (server will broadcast back to both)
     console.log('[SYNC][STOP] Sending stop_recording command to server');
     sendSyncCommand('stop_recording');
@@ -651,19 +696,43 @@ export default function SyncRecordingScreen() {
 
   const saveRecording = async (videoUri: string) => {
     try {
-      console.log('💾 Saving recording:', videoUri);
+      console.log('💾 Saving recording (raw path):', videoUri);
 
-      const asset = await MediaLibrary.createAssetAsync(videoUri);
+      // Normalize to file URI for MediaLibrary
+      const uri = videoUri.startsWith('file://') ? videoUri : `file://${videoUri}`;
+      console.log('💾 Saving recording (file uri):', uri);
 
-      let album = await MediaLibrary.getAlbumAsync('Raydel Sync Recordings');
-      if (!album) {
-        album = await MediaLibrary.createAlbumAsync(
-          'Raydel Sync Recordings',
-          asset,
-          false
-        );
-      } else {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      // Ensure permission at save time (Android may revoke at runtime)
+      const perm = await MediaLibrary.requestPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Storage Permission Required', 'Please enable storage access to save videos.');
+        return;
+      }
+
+      let asset: MediaLibrary.Asset | null = null;
+      try {
+        asset = await MediaLibrary.createAssetAsync(uri);
+      } catch (e) {
+        console.warn('createAssetAsync failed, trying saveToLibraryAsync. Error:', e);
+        try {
+          await MediaLibrary.saveToLibraryAsync(uri);
+        } catch (e2) {
+          console.error('saveToLibraryAsync also failed:', e2);
+          throw e2;
+        }
+      }
+
+      if (asset) {
+        let album = await MediaLibrary.getAlbumAsync('Raydel Sync Recordings');
+        if (!album) {
+          album = await MediaLibrary.createAlbumAsync(
+            'Raydel Sync Recordings',
+            asset,
+            false
+          );
+        } else {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        }
       }
 
       Alert.alert(
@@ -905,6 +974,7 @@ export default function SyncRecordingScreen() {
                 audio={true}
                 onInitialized={() => {
                   console.log('📷 Camera ready callback');
+                  setIsCameraReady(true);
                 }}
               />
             ) : (
