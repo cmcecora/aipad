@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import * as React from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -27,6 +28,12 @@ import type {
   CourtLine,
   FrameData,
 } from '../types/computerVision';
+import {
+  Camera,
+  useCameraPermission,
+  useCameraDevices,
+  useFrameProcessor,
+} from 'react-native-vision-camera';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -41,74 +48,39 @@ interface LinePosition {
 }
 
 export default function CalibrationScreen() {
-  // Check if we're running in Expo Go (which doesn't support react-native-vision-camera)
-  // In a development build, we can access react-native-vision-camera
-  const isExpoGo = false; // We're using a development build now
+  // Disable mock detection by default so lines start red until real detection is available
+  const USE_MOCK_DETECTION = false;
+  // Vision Camera hooks (called at top-level)
+  const {
+    hasPermission: vcHasPermission,
+    requestPermission: vcRequestPermission,
+  } = useCameraPermission();
+  const vcDevices = useCameraDevices();
 
-  if (isExpoGo) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>
-          Court calibration requires a development build
-        </Text>
-        <Text style={[styles.permissionText, { fontSize: 14, marginTop: 10 }]}>
-          This feature uses react-native-vision-camera which is not supported in
-          Expo Go. Please use `expo run:android` or `expo run:ios` to create a
-          development build.
-        </Text>
-        <TouchableOpacity
-          style={[styles.permissionButton, { marginTop: 20 }]}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.permissionButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // State for tracking module loading
+  // Removed dynamic module loading state; using static imports
 
-  // Dynamic imports for development build only
-  const [Camera, setCamera] = useState<any>(null);
-  const [useCameraPermission, setUseCameraPermission] = useState<any>(null);
-  const [useCameraDevices, setUseCameraDevices] = useState<any>(null);
-  const [useFrameProcessor, setUseFrameProcessor] = useState<any>(null);
-  const [useRunOnJS, setUseRunOnJS] = useState<any>(null);
+  // (removed dynamic import state; using static vision-camera imports)
 
-  // Load vision camera modules dynamically
-  useEffect(() => {
-    const loadVisionCamera = async () => {
-      try {
-        const visionCamera = await import('react-native-vision-camera');
-        const workletsCore = await import('react-native-worklets-core');
+  // (dynamic vision-camera loader removed)
 
-        setCamera(visionCamera.Camera);
-        setUseCameraPermission(visionCamera.useCameraPermission);
-        setUseCameraDevices(visionCamera.useCameraDevices);
-        setUseFrameProcessor(visionCamera.useFrameProcessor);
-        setUseRunOnJS(workletsCore.useRunOnJS);
-      } catch (error) {
-        console.error('Failed to load vision camera:', error);
-      }
-    };
-
-    if (!isExpoGo) {
-      loadVisionCamera();
-    }
-  }, [isExpoGo]);
-
+  // Camera state hooks must be declared before any conditional returns
   const cameraRef = useRef<any>(null);
   const [hasPermission, setHasPermission] = useState(false);
   const [device, setDevice] = useState<any>(null);
   const [cameraReady, setCameraReady] = useState(false);
 
-  const [step, setStep] = useState<CalibrationStep>('positioning');
+  // (removed module loading error/loader UI)
+
+  // (camera state moved above)
+
+  const [step, setStep] = useState('positioning');
   const [isAligned, setIsAligned] = useState(false);
-  const [detectedLines, setDetectedLines] = useState<DetectedLine[]>([]);
-  const [courtLines, setCourtLines] = useState<CourtLine[]>([]);
-  const [detectionStats, setDetectionStats] = useState<{
-    processingTime: number;
-    confidence: number;
-    lineCount: number;
-  } | null>(null);
+  const [detectedLines, setDetectedLines] = useState<any[]>([]);
+  const [courtLines, setCourtLines] = useState<any[]>([]);
+  const [detectionStats, setDetectionStats] = useState<any>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Real-time processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -127,7 +99,7 @@ export default function CalibrationScreen() {
   const initialWidth = Math.max(screenWidth, screenHeight);
   const initialHeight = Math.min(screenWidth, screenHeight);
 
-  const [linePositions] = useState<LinePosition[]>([
+  const [linePositions] = useState<any[]>([
     // Top line: 15% from top, centered horizontally
     { id: 'topBackWall', x: initialWidth * 0.5, y: initialHeight * 0.15 },
     // Bottom line: 75% from top, centered horizontally
@@ -136,45 +108,16 @@ export default function CalibrationScreen() {
     { id: 'verticalCenter', x: initialWidth * 0.5, y: initialHeight * 0.5 },
   ]);
 
-  // Mock line detection for demonstration
+  // Mock line detection (disabled by default)
   const detectCourtLines = useCallback(() => {
-    // This is a simplified mock detection
-    // In a real app with development build, you'd use react-native-vision-camera
-    const mockLines: DetectedLine[] = [
-      {
-        x1: initialWidth * 0.2,
-        y1: initialHeight * 0.15,
-        x2: initialWidth * 0.8,
-        y2: initialHeight * 0.15,
-        confidence: 0.85,
-        type: 'horizontal',
-        angle: 0,
-        length: initialWidth * 0.6,
-      },
-      {
-        x1: initialWidth * 0.2,
-        y1: initialHeight * 0.75,
-        x2: initialWidth * 0.8,
-        y2: initialHeight * 0.75,
-        confidence: 0.8,
-        type: 'horizontal',
-        angle: 0,
-        length: initialWidth * 0.6,
-      },
-      {
-        x1: initialWidth * 0.5,
-        y1: initialHeight * 0.1,
-        x2: initialWidth * 0.5,
-        y2: initialHeight * 0.9,
-        confidence: 0.75,
-        type: 'vertical',
-        angle: 90,
-        length: initialHeight * 0.8,
-      },
-    ];
+    if (!USE_MOCK_DETECTION) {
+      setDetectedLines([]);
+      return [] as any[];
+    }
+    const mockLines: any[] = [];
     setDetectedLines(mockLines);
     return mockLines;
-  }, [initialWidth, initialHeight]);
+  }, [USE_MOCK_DETECTION]);
 
   // Check line alignment
   const checkLineAlignment = useCallback(
@@ -208,66 +151,25 @@ export default function CalibrationScreen() {
     [initialWidth, initialHeight]
   );
 
-  // Initialize camera permissions and devices
+  // Initialize camera permissions and devices from Vision Camera
   useEffect(() => {
-    if (useCameraPermission && useCameraDevices) {
-      const { hasPermission: perm, requestPermission } = useCameraPermission();
-      const devices = useCameraDevices();
-      const backDevice = devices.find((d: any) => d.position === 'back');
+    const backDevice = vcDevices.find((d: any) => d.position === 'back');
+    setHasPermission(!!vcHasPermission);
+    setDevice(backDevice || null);
+  }, [vcHasPermission, vcDevices]);
 
-      setHasPermission(perm);
-      setDevice(backDevice);
+  useEffect(() => {
+    if (!vcHasPermission) {
+      vcRequestPermission().catch(() => {});
     }
-  }, [useCameraPermission, useCameraDevices]);
+  }, [vcHasPermission, vcRequestPermission]);
 
-  // Vision Camera frame processor hook for real-time processing
-  const runOnJS = useRunOnJS
-    ? useRunOnJS(
-        (result: any) => {
-          if (result.success) {
-            // Update state with real-time results
-            setCourtLines(result.courtLines);
-            setDetectedLines(result.detectedLines);
-            setDetectionStats({
-              processingTime: result.performanceMetrics.processingTime,
-              confidence:
-                result.performanceMetrics.qualityLevel === 'high' ? 0.9 : 0.7,
-              lineCount: result.courtLines.length,
-            });
-
-            // Check alignment with real-time data
-            const aligned = checkLineAlignment(result.detectedLines);
-            if (aligned !== isAligned) {
-              setIsAligned(aligned);
-              setStep(aligned ? 'complete' : 'positioning');
-              fade.value = withTiming(aligned ? 1 : 0.8, { duration: 250 });
-            }
-          }
-        },
-        [checkLineAlignment, isAligned, fade]
-      )
-    : null;
-
-  const frameProcessor = useFrameProcessor
-    ? useFrameProcessor(
-        (frame: any) => {
-          'worklet';
-
-          try {
-            // Use our worklet-based frame processor for optimal performance
-            const result = WorkletFrameProcessor.processFrameWorklet(frame);
-
-            // Send results back to JS thread for state updates
-            if (runOnJS) {
-              runOnJS(result);
-            }
-          } catch (error) {
-            console.error('Worklet error:', error);
-          }
-        },
-        [runOnJS]
-      )
-    : null;
+  // Frame processor for camera (currently disabled for performance)
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+    // Frame processing is currently disabled to maintain performance
+    // This will be implemented in future phases when real-time detection is needed
+  }, []);
 
   useEffect(() => {
     // Lock orientation to landscape for calibration
@@ -298,29 +200,44 @@ export default function CalibrationScreen() {
     );
   }, [pulse]);
 
-  // Simulate periodic line detection
+  // Periodic detection loop (no-op unless detection provides lines)
   useEffect(() => {
-    if (cameraReady && step === 'positioning') {
+    if (cameraReady) {
       const interval = setInterval(() => {
         const lines = detectCourtLines();
         const aligned = checkLineAlignment(lines);
-        if (aligned !== isAligned) {
-          setIsAligned(aligned);
-          setStep(aligned ? 'complete' : 'positioning');
-          fade.value = withTiming(aligned ? 1 : 0.8, { duration: 250 });
+        if (aligned && !isAligned) {
+          setIsAligned(true);
+          setStep('complete');
+          fade.value = withTiming(1, { duration: 250 });
+          setShowSuccess(true);
+          if (successTimerRef.current) clearTimeout(successTimerRef.current);
+          successTimerRef.current = setTimeout(
+            () => setShowSuccess(false),
+            10000
+          );
+        } else if (!aligned && isAligned) {
+          setIsAligned(false);
+          setStep('positioning');
+          fade.value = withTiming(0.8, { duration: 250 });
+          if (successTimerRef.current) {
+            clearTimeout(successTimerRef.current);
+            successTimerRef.current = null;
+          }
+          setShowSuccess(false);
         }
       }, 1000);
-
       return () => clearInterval(interval);
     }
-  }, [
-    cameraReady,
-    step,
-    detectCourtLines,
-    checkLineAlignment,
-    isAligned,
-    fade,
-  ]);
+  }, [cameraReady, detectCourtLines, checkLineAlignment, isAligned, fade]);
+
+  // Cleanup success banner timer on unmount
+  useEffect(
+    () => () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    },
+    []
+  );
 
   const renderLines = () =>
     linePositions.map((line) => {
@@ -392,8 +309,7 @@ export default function CalibrationScreen() {
         <TouchableOpacity
           style={styles.permissionButton}
           onPress={() => {
-            // Request permission logic would go here
-            setHasPermission(true);
+            vcRequestPermission();
           }}
         >
           <Text style={styles.permissionButtonText}>Grant Permission</Text>
@@ -411,27 +327,29 @@ export default function CalibrationScreen() {
     );
   }
 
-  // Don't render camera if Camera component is not loaded
-  if (!Camera) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionText}>Loading camera...</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        device={device}
-        isActive={true}
-        frameProcessor={frameProcessor}
-        pixelFormat="rgb"
-        onInitialized={() => setCameraReady(true)}
-        onError={(error: any) => console.error('Camera error:', error)}
-      />
+      {device ? (
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          device={device}
+          isActive={true}
+          frameProcessor={frameProcessor}
+          pixelFormat="rgb"
+          onInitialized={() => setCameraReady(true)}
+          onError={(error: any) => console.error('Camera error:', error)}
+        />
+      ) : (
+        <View style={[styles.camera, styles.mockCamera]}>
+          <Text style={styles.mockCameraText}>Camera Preview</Text>
+          <Text
+            style={[styles.mockCameraText, { fontSize: 14, marginTop: 10 }]}
+          >
+            Camera modules not available in this build
+          </Text>
+        </View>
+      )}
 
       {/* AR Fixed Guides */}
       {renderLines()}
@@ -460,8 +378,8 @@ export default function CalibrationScreen() {
         </View>
       </View>
 
-      {/* Perfect Position Indicator */}
-      {isAligned && (
+      {/* Perfect Position Indicator (limited to 10s after alignment) */}
+      {showSuccess && (
         <Animated.View style={[styles.perfectContainer, pulseStyle]}>
           <Ionicons name="checkmark-circle" size={34} color="#4CAF50" />
           <Text style={styles.perfectText}>Court lines detected!</Text>
@@ -478,8 +396,8 @@ export default function CalibrationScreen() {
         </Animated.View>
       )}
 
-      {/* Success message */}
-      {isAligned && (
+      {/* Success message (limited to 10s after alignment) */}
+      {showSuccess && (
         <Animated.View style={[styles.successContainer, fadeStyle]}>
           <Text style={styles.successText}>
             Perfect! Court lines are aligned.{'\n'}
@@ -493,10 +411,25 @@ export default function CalibrationScreen() {
         <TouchableOpacity
           style={styles.testButton}
           onPress={() => {
-            const lines = detectCourtLines();
-            const aligned = checkLineAlignment(lines);
-            setIsAligned(aligned);
-            setStep(aligned ? 'complete' : 'positioning');
+            // Dev toggle: simulate alignment transition to verify UI behavior
+            const next = !isAligned;
+            setIsAligned(next);
+            setStep(next ? 'complete' : 'positioning');
+            if (next) {
+              setShowSuccess(true);
+              if (successTimerRef.current)
+                clearTimeout(successTimerRef.current);
+              successTimerRef.current = setTimeout(
+                () => setShowSuccess(false),
+                10000
+              );
+            } else {
+              if (successTimerRef.current) {
+                clearTimeout(successTimerRef.current);
+                successTimerRef.current = null;
+              }
+              setShowSuccess(false);
+            }
           }}
         >
           <Text style={styles.testButtonText}>Test Alignment</Text>
@@ -509,6 +442,16 @@ export default function CalibrationScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
+  mockCamera: {
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mockCameraText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
   controls: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 50 : 30,
