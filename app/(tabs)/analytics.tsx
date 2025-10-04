@@ -861,15 +861,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#333',
+    maxHeight: 48,
   },
   tabContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   tab: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    minWidth: 100,
+    justifyContent: 'center',
   },
   tabActive: {
     borderBottomWidth: 2,
@@ -877,7 +879,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: '#888',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   tabTextActive: {
@@ -1160,6 +1162,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingTop: 8,
   },
   shotTypeCard: {
     backgroundColor: '#1a1a1a',
