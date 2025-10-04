@@ -52,13 +52,17 @@ export class VideoUtils {
     try {
       const asset = await MediaLibrary.createAssetAsync(videoUri);
       const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
+      const detailedInfo = assetInfo as MediaLibrary.AssetInfo & {
+        fileSize?: number;
+        size?: number;
+      };
       
       return {
         uri: videoUri,
         duration: assetInfo.duration || 0,
         width: assetInfo.width || 0,
         height: assetInfo.height || 0,
-        size: assetInfo.fileSize || 0,
+  size: detailedInfo.fileSize ?? detailedInfo.size ?? 0,
         filename: assetInfo.filename || 'video.mp4'
       };
     } catch (error) {

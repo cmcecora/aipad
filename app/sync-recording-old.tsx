@@ -63,6 +63,10 @@ export default function SyncRecordingScreen() {
   const cameraInitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const cameraIsRecordingRef = useRef(false);
+  const pendingStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
@@ -81,6 +85,10 @@ export default function SyncRecordingScreen() {
       if (cameraInitTimeoutRef.current) {
         clearTimeout(cameraInitTimeoutRef.current);
       }
+      if (pendingStartTimeoutRef.current) {
+        clearTimeout(pendingStartTimeoutRef.current);
+      }
+      cameraIsRecordingRef.current = false;
     };
   }, []);
 
@@ -537,9 +545,13 @@ export default function SyncRecordingScreen() {
               retryCount + 1
             }/3 in 300ms...`
           );
-          setTimeout(() => {
+          if (pendingStartTimeoutRef.current) {
+            clearTimeout(pendingStartTimeoutRef.current);
+          }
+          pendingStartTimeoutRef.current = setTimeout(() => {
             setIsRecordingAttemptInProgress(false);
             handleStartRecording(true, retryCount + 1);
+            pendingStartTimeoutRef.current = null;
           }, 300);
           return;
         } else {

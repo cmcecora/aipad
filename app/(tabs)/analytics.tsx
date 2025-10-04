@@ -5,6 +5,17 @@ import { TrendingUp, Target, Clock, Award, Filter, Calendar, Activity, Users, Za
 
 const { width } = Dimensions.get('window');
 
+type PercentageString = `${number}%`;
+
+interface TechnicalFactor {
+  title: string;
+  value: PercentageString;
+  weight: PercentageString;
+  change: string;
+  color: string;
+  description: string;
+}
+
 export default function AnalyticsScreen() {
   const [selectedTab, setSelectedTab] = useState('overview');
   const [currentRating] = useState(1547);
@@ -44,7 +55,7 @@ export default function AnalyticsScreen() {
   ];
 
   // Primary Technical Factors (70% Total Weight)
-  const technicalFactors = [
+  const technicalFactors: TechnicalFactor[] = [
     { 
       title: 'Technical Execution', 
       value: '87%', 

@@ -4,16 +4,27 @@ import {
   CameraView,
   useCameraPermissions,
   useMicrophonePermissions,
+  type VideoQuality,
 } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { Play, Square, Camera } from 'lucide-react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
+type VideoQualityOption = '480p' | '720p' | '1080p' | '2160p' | '4k';
+
+const VIDEO_QUALITY_MAP: Record<VideoQualityOption, VideoQuality> = {
+  '480p': '480p',
+  '720p': '720p',
+  '1080p': '1080p',
+  '2160p': '2160p',
+  '4k': '2160p',
+};
+
 interface VideoRecorderProps {
   onRecordingComplete?: (videoUri: string) => void;
   onError?: (error: string) => void;
   maxDuration?: number;
-  quality?: '480p' | '720p' | '1080p' | '4k';
+  quality?: VideoQualityOption;
 }
 
 export default function VideoRecorder({
@@ -31,9 +42,10 @@ export default function VideoRecorder({
   const [isRecording, setIsRecording] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const resolvedVideoQuality = VIDEO_QUALITY_MAP[quality];
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (isRecording) {
       interval = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
@@ -41,7 +53,11 @@ export default function VideoRecorder({
     } else {
       setRecordingTime(0);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [isRecording]);
 
   useEffect(() => {
@@ -111,12 +127,12 @@ export default function VideoRecorder({
 
       const recording = await cameraRef.current.recordAsync({
         maxDuration,
-        quality,
-        mute: false,
       });
 
       if (recording?.uri) {
         await saveVideoToGallery(recording.uri);
+      } else {
+        setIsRecording(false);
       }
     } catch (error) {
       console.error('Recording error:', error);
@@ -195,11 +211,8 @@ export default function VideoRecorder({
         style={styles.camera}
         facing="back"
         mode="video"
-        onRecordingStatusChange={(status) => {
-          if (!status.isRecording && isRecording) {
-            setIsRecording(false);
-          }
-        }}
+        videoQuality={resolvedVideoQuality}
+        mute={false}
       />
 
       <View style={styles.overlay}>

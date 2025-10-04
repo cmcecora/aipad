@@ -1,12 +1,22 @@
 import { useState, useRef, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions, type VideoQuality } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { VideoUtils } from '../utils/videoUtils';
 
+type VideoQualityOption = '480p' | '720p' | '1080p' | '2160p' | '4k';
+
+const VIDEO_QUALITY_MAP: Record<VideoQualityOption, VideoQuality> = {
+  '480p': '480p',
+  '720p': '720p',
+  '1080p': '1080p',
+  '2160p': '2160p',
+  '4k': '2160p',
+};
+
 export interface UseVideoRecordingOptions {
   maxDuration?: number;
-  quality?: '480p' | '720p' | '1080p' | '4k';
+  quality?: VideoQualityOption;
   albumName?: string;
   onRecordingStart?: () => void;
   onRecordingStop?: () => void;
@@ -34,7 +44,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
   } = options;
 
   const cameraRef = useRef<CameraView>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout>();
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
@@ -47,6 +57,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
     hasPermissions: false,
     isInitialized: false
   });
+  const resolvedVideoQuality = VIDEO_QUALITY_MAP[quality];
 
   const updateState = useCallback((updates: Partial<VideoRecordingState>) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -123,7 +134,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
   const stopRecordingTimer = useCallback(() => {
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = undefined;
+      recordingTimerRef.current = null;
     }
     updateState({ recordingTime: 0 });
   }, [updateState]);
@@ -150,12 +161,13 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
           if (cameraRef.current) {
             const recording = await cameraRef.current.recordAsync({
               maxDuration,
-              quality,
-              mute: false,
             });
 
             if (recording?.uri) {
               await handleRecordingComplete(recording.uri);
+            } else {
+              updateState({ isRecording: false });
+              stopRecordingTimer();
             }
           }
         } catch (recordError) {
@@ -258,6 +270,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
     
     // Utilities
     formatRecordingTime: () => formatRecordingTime(state.recordingTime),
+  videoQuality: resolvedVideoQuality,
     
     // Permission states
     permissions: {
