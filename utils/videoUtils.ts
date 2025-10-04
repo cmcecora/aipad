@@ -19,8 +19,8 @@ export class VideoUtils {
     albumName: string = 'Raydel Recordings'
   ): Promise<MediaLibrary.Asset | null> {
     try {
-      // Check permissions
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      // Check permissions - request audio access explicitly for Android
+      const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
         Alert.alert('Permission Required', 'Storage permission is needed to save videos');
         return null;

@@ -17,7 +17,8 @@
         {
           "photosPermission": "Allow saving recorded videos to your photo library.",
           "savePhotosPermission": "Allow saving to your photo library.",
-          "isAccessMediaLocationEnabled": true
+          "isAccessMediaLocationEnabled": true,
+          "granularPermissions": ["photo", "video"]
         }
       ]
     ],
@@ -37,7 +38,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lfdemo.boltexponativewind"
+      "bundleIdentifier": "com.lfdemo.boltexponativewind",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to camera to record padel matches for analysis.",
+        "NSMicrophoneUsageDescription": "This app needs access to microphone to record audio during matches.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to photo library to save recorded match videos.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs permission to save recorded videos to your photo library."
+      }
     },
     "name": "bolt-expo-nativewind",
     "slug": "bolt-expo-nativewind",
