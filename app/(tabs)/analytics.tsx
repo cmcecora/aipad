@@ -20,6 +20,7 @@ export default function AnalyticsScreen() {
     { key: 'overview', label: 'Overview' },
     { key: 'shots', label: 'Shots' },
     { key: 'movement', label: 'Movement' },
+    { key: 'competition', label: 'Competition' },
     { key: 'analysis', label: 'Analysis' },
     { key: 'rankings', label: 'Rankings' }
   ];
@@ -473,6 +474,108 @@ export default function AnalyticsScreen() {
           </View>
         );
 
+      case 'competition':
+        return (
+          <View>
+            {/* Match Outcome */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Match Outcome</Text>
+              <View style={styles.categoryCard}>
+                <View style={styles.indicatorRow}>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Game Differential</Text>
+                    <Text style={[styles.indicatorValue, { color: '#00FF88' }]}>+24</Text>
+                    <Text style={styles.indicatorUnit}>total</Text>
+                  </View>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Set Differential</Text>
+                    <Text style={[styles.indicatorValue, { color: '#00D4FF' }]}>+8</Text>
+                    <Text style={styles.indicatorUnit}>total</Text>
+                  </View>
+                </View>
+                <View style={styles.indicatorRow}>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Match Differential</Text>
+                    <Text style={[styles.indicatorValue, { color: '#FFD700' }]}>+5</Text>
+                    <Text style={styles.indicatorUnit}>W-L record</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Opponent Rating Differential */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Opponent Rating Differential</Text>
+              <View style={styles.categoryCard}>
+                <View style={styles.opponentDifferentialContainer}>
+                  <View style={styles.opponentDifferentialHeader}>
+                    <Text style={styles.opponentDifferentialTitle}>Adjustment Based on Opponent Strength</Text>
+                    <Text style={[styles.opponentDifferentialValue, { color: '#00FF88' }]}>+127</Text>
+                  </View>
+                  <View style={styles.opponentDifferentialDetails}>
+                    <View style={styles.opponentDifferentialRow}>
+                      <Text style={styles.opponentDifferentialLabel}>vs Higher Rated</Text>
+                      <Text style={[styles.opponentDifferentialStat, { color: '#00FF88' }]}>+89</Text>
+                    </View>
+                    <View style={styles.opponentDifferentialRow}>
+                      <Text style={styles.opponentDifferentialLabel}>vs Similar Rated</Text>
+                      <Text style={[styles.opponentDifferentialStat, { color: '#00D4FF' }]}>+42</Text>
+                    </View>
+                    <View style={styles.opponentDifferentialRow}>
+                      <Text style={styles.opponentDifferentialLabel}>vs Lower Rated</Text>
+                      <Text style={[styles.opponentDifferentialStat, { color: '#FFD700' }]}>-4</Text>
+                    </View>
+                  </View>
+                  <View style={styles.opponentDifferentialNote}>
+                    <Text style={styles.opponentDifferentialNoteText}>
+                      Positive rating adjustments indicate strong performance relative to opponent strength
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Recent Match Performance */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recent Match Performance</Text>
+              {[
+                { opponent: 'Carlos Rodriguez', opponentRating: 1689, result: 'Win', gameDiff: '+4', setDiff: '+2', adjustment: '+28', color: '#00FF88' },
+                { opponent: 'Maria Santos', opponentRating: 1623, result: 'Win', gameDiff: '+3', setDiff: '+1', adjustment: '+18', color: '#00FF88' },
+                { opponent: 'Juan Martinez', opponentRating: 1501, result: 'Loss', gameDiff: '-2', setDiff: '-1', adjustment: '-12', color: '#FF6B6B' },
+                { opponent: 'Ana Gonzalez', opponentRating: 1578, result: 'Win', gameDiff: '+5', setDiff: '+2', adjustment: '+24', color: '#00FF88' },
+              ].map((match, index) => (
+                <View key={index} style={styles.matchCard}>
+                  <View style={styles.matchHeader}>
+                    <View>
+                      <Text style={styles.matchOpponent}>{match.opponent}</Text>
+                      <Text style={styles.matchRating}>Rating: {match.opponentRating}</Text>
+                    </View>
+                    <View style={[styles.matchResultBadge, { backgroundColor: match.color }]}>
+                      <Text style={styles.matchResultText}>{match.result}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.matchStats}>
+                    <View style={styles.matchStat}>
+                      <Text style={styles.matchStatLabel}>Games</Text>
+                      <Text style={styles.matchStatValue}>{match.gameDiff}</Text>
+                    </View>
+                    <View style={styles.matchStat}>
+                      <Text style={styles.matchStatLabel}>Sets</Text>
+                      <Text style={styles.matchStatValue}>{match.setDiff}</Text>
+                    </View>
+                    <View style={styles.matchStat}>
+                      <Text style={styles.matchStatLabel}>Rating Δ</Text>
+                      <Text style={[styles.matchStatValue, { color: match.color }]}>
+                        {match.adjustment}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+
       case 'analysis':
         return (
           <View>
@@ -701,7 +804,12 @@ export default function AnalyticsScreen() {
       </LinearGradient>
 
       {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabScrollContainer}
+        contentContainerStyle={styles.tabContainer}
+      >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -719,7 +827,7 @@ export default function AnalyticsScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Content */}
       <View style={styles.content}>
@@ -749,16 +857,19 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 4,
   },
-  tabContainer: {
-    flexDirection: 'row',
+  tabScrollContainer: {
     backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
+  tabContainer: {
+    flexDirection: 'row',
+  },
   tab: {
-    flex: 1,
     paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
+    minWidth: 100,
   },
   tabActive: {
     borderBottomWidth: 2,
@@ -1408,5 +1519,105 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
     textAlign: 'center',
+  },
+  opponentDifferentialContainer: {
+    padding: 8,
+  },
+  opponentDifferentialHeader: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  opponentDifferentialTitle: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  opponentDifferentialValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  opponentDifferentialDetails: {
+    marginBottom: 16,
+  },
+  opponentDifferentialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  opponentDifferentialLabel: {
+    fontSize: 14,
+    color: '#888',
+  },
+  opponentDifferentialStat: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  opponentDifferentialNote: {
+    backgroundColor: '#0a0a0a',
+    padding: 12,
+    borderRadius: 8,
+  },
+  opponentDifferentialNoteText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  matchCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  matchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  matchOpponent: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  matchRating: {
+    fontSize: 12,
+    color: '#888',
+  },
+  matchResultBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  matchResultText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  matchStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  matchStat: {
+    alignItems: 'center',
+  },
+  matchStatLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  matchStatValue: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
