@@ -13,7 +13,7 @@ import {
   Target,
   Clock,
   Award,
-  ListFilter as Filter,
+  Filter,
   Calendar,
   Activity,
   Users,
@@ -27,6 +27,17 @@ import {
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
+
+type PercentageString = `${number}%`;
+
+interface TechnicalFactor {
+  title: string;
+  value: PercentageString;
+  weight: PercentageString;
+  change: string;
+  color: string;
+  description: string;
+}
 
 export default function AnalyticsScreen() {
   const [selectedTab, setSelectedTab] = useState('overview');
@@ -97,7 +108,7 @@ export default function AnalyticsScreen() {
   ];
 
   // Primary Technical Factors (70% Total Weight)
-  const technicalFactors = [
+  const technicalFactors: TechnicalFactor[] = [
     {
       title: 'Technical Execution',
       value: '87%',
@@ -309,7 +320,7 @@ export default function AnalyticsScreen() {
                       style={[
                         styles.progressFill,
                         {
-                          width: factor.value as any,
+                          width: factor.value,
                           backgroundColor: factor.color,
                         },
                       ]}
@@ -398,86 +409,6 @@ export default function AnalyticsScreen() {
                   </View>
                 </View>
               ))}
-            </View>
-
-            {/* Shot Consistency / Game Flow */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Shot Consistency / Game Flow
-              </Text>
-              <View style={styles.categoryCard}>
-                <View style={styles.indicatorRow}>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Consecutive Shots</Text>
-                    <Text style={[styles.indicatorValue, { color: '#00FF88' }]}>
-                      8.2
-                    </Text>
-                    <Text style={styles.indicatorUnit}>avg streak</Text>
-                  </View>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Rally Maintenance</Text>
-                    <Text style={[styles.indicatorValue, { color: '#00D4FF' }]}>
-                      76%
-                    </Text>
-                    <Text style={styles.indicatorUnit}>sustained</Text>
-                  </View>
-                </View>
-                <View style={styles.indicatorRow}>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Breaking Rhythm</Text>
-                    <Text style={[styles.indicatorValue, { color: '#FFD700' }]}>
-                      23
-                    </Text>
-                    <Text style={styles.indicatorUnit}>per match</Text>
-                  </View>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Unforced Errors</Text>
-                    <Text style={[styles.indicatorValue, { color: '#FF6B6B' }]}>
-                      12%
-                    </Text>
-                    <Text style={styles.indicatorUnit}>rate</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Winner's Impact */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Winner's Impact</Text>
-              <View style={styles.categoryCard}>
-                <View style={styles.indicatorRow}>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Clean Winner</Text>
-                    <Text style={[styles.indicatorValue, { color: '#00FF88' }]}>
-                      34
-                    </Text>
-                    <Text style={styles.indicatorUnit}>total</Text>
-                  </View>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Forced Error</Text>
-                    <Text style={[styles.indicatorValue, { color: '#00D4FF' }]}>
-                      28
-                    </Text>
-                    <Text style={styles.indicatorUnit}>induced</Text>
-                  </View>
-                </View>
-                <View style={styles.indicatorRow}>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Set-Winning</Text>
-                    <Text style={[styles.indicatorValue, { color: '#FFD700' }]}>
-                      7
-                    </Text>
-                    <Text style={styles.indicatorUnit}>shots</Text>
-                  </View>
-                  <View style={styles.indicator}>
-                    <Text style={styles.indicatorLabel}>Match-Winning</Text>
-                    <Text style={[styles.indicatorValue, { color: '#9D4EDD' }]}>
-                      3
-                    </Text>
-                    <Text style={styles.indicatorUnit}>shots</Text>
-                  </View>
-                </View>
-              </View>
             </View>
 
             {/* Shot Type Analysis */}
@@ -1568,41 +1499,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     lineHeight: 20,
-  },
-  categoryCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  indicatorRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  indicator: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginHorizontal: 4,
-    backgroundColor: '#0a0a0a',
-    borderRadius: 8,
-  },
-  indicatorLabel: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  indicatorValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  indicatorUnit: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
   },
 });
