@@ -401,7 +401,7 @@ export default function AnalyticsScreen() {
                   </View>
                 </View>
               </View>
-              
+
               <View style={styles.movementStats}>
                 <View style={styles.movementStat}>
                   <Text style={styles.movementValue}>85%</Text>
@@ -414,6 +414,37 @@ export default function AnalyticsScreen() {
                 <View style={styles.movementStat}>
                   <Text style={styles.movementValue}>82%</Text>
                   <Text style={styles.movementLabel}>Recovery Efficiency</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Court Positioning */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Court Positioning</Text>
+              <View style={styles.categoryCard}>
+                <View style={styles.indicatorRow}>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Optimal Position</Text>
+                    <Text style={[styles.indicatorValue, { color: '#00FF88' }]}>68%</Text>
+                    <Text style={styles.indicatorUnit}>of time</Text>
+                  </View>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Poor Position</Text>
+                    <Text style={[styles.indicatorValue, { color: '#FF6B6B' }]}>14%</Text>
+                    <Text style={styles.indicatorUnit}>of time</Text>
+                  </View>
+                </View>
+                <View style={styles.indicatorRow}>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Strategic Changes</Text>
+                    <Text style={[styles.indicatorValue, { color: '#00D4FF' }]}>42</Text>
+                    <Text style={styles.indicatorUnit}>per match</Text>
+                  </View>
+                  <View style={styles.indicator}>
+                    <Text style={styles.indicatorLabel}>Out of Position</Text>
+                    <Text style={[styles.indicatorValue, { color: '#FFD700' }]}>18%</Text>
+                    <Text style={styles.indicatorUnit}>of time</Text>
+                  </View>
                 </View>
               </View>
             </View>
