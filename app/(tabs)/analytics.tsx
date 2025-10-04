@@ -245,7 +245,7 @@ export default function AnalyticsScreen() {
     switch (selectedTab) {
       case 'overview':
         return (
-          <View>
+          <View key="overview">
             {/* Current Rating */}
             <View style={styles.ratingSection}>
               <View style={styles.ratingCard}>
@@ -366,7 +366,7 @@ export default function AnalyticsScreen() {
 
       case 'shots':
         return (
-          <View>
+          <View key="shots">
             {/* Shot Quality Breakdown */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Shot Quality Distribution</Text>
@@ -575,7 +575,7 @@ export default function AnalyticsScreen() {
 
       case 'movement':
         return (
-          <View>
+          <View key="movement">
             {/* Court Movement Analysis */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
@@ -681,21 +681,23 @@ export default function AnalyticsScreen() {
 
       case 'competition':
         return (
-          <View>
+          <View key="competition">
             {/* Match Outcome */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Match Outcome</Text>
               <View style={styles.categoryCard}>
                 <View style={styles.matchOutcomeRow}>
                   <View style={styles.matchOutcomeIndicator}>
-                    <Text style={styles.indicatorLabel}>Game Differential</Text>
+                    <Text style={styles.matchOutcomeLabel}>
+                      Game{'\n'}Differential
+                    </Text>
                     <Text style={[styles.indicatorValue, { color: '#00FF88' }]}>
                       +24
                     </Text>
                     <Text style={styles.indicatorUnit}>total</Text>
                   </View>
                   <View style={styles.matchOutcomeIndicator}>
-                    <Text style={styles.indicatorLabel}>
+                    <Text style={styles.matchOutcomeLabel}>
                       Set{'\n'}Differential
                     </Text>
                     <Text style={[styles.indicatorValue, { color: '#00D4FF' }]}>
@@ -704,8 +706,8 @@ export default function AnalyticsScreen() {
                     <Text style={styles.indicatorUnit}>total</Text>
                   </View>
                   <View style={styles.matchOutcomeIndicator}>
-                    <Text style={styles.indicatorLabel}>
-                      Match Differential
+                    <Text style={styles.matchOutcomeLabel}>
+                      Match{'\n'}Differential
                     </Text>
                     <Text style={[styles.indicatorValue, { color: '#FFD700' }]}>
                       +5
@@ -873,7 +875,7 @@ export default function AnalyticsScreen() {
 
       case 'analysis':
         return (
-          <View>
+          <View key="analysis">
             {/* AI-Powered Insights */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>AI-Powered Insights</Text>
@@ -965,7 +967,7 @@ export default function AnalyticsScreen() {
 
       case 'rankings':
         return (
-          <View>
+          <View key="rankings">
             {/* User Position Card */}
             <View style={styles.userPositionCard}>
               <LinearGradient
@@ -1950,17 +1952,25 @@ const styles = StyleSheet.create({
   },
   matchOutcomeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   matchOutcomeIndicator: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     marginHorizontal: 4,
     backgroundColor: '#0a0a0a',
     borderRadius: 8,
-    minHeight: 100,
+    minHeight: 110,
+    width: 'auto',
+    height: 'auto',
+  },
+  matchOutcomeLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 8,
+    textAlign: 'center',
+    height: 32,
+    lineHeight: 16,
   },
 });
