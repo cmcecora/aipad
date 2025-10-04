@@ -55,7 +55,8 @@ export default function SyncRecordingScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [shouldShowCamera, setShouldShowCamera] = useState(false);
   const [otherDeviceCameraReady, setOtherDeviceCameraReady] = useState(false);
-  const [isRecordingAttemptInProgress, setIsRecordingAttemptInProgress] = useState(false);
+  const [isRecordingAttemptInProgress, setIsRecordingAttemptInProgress] =
+    useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -283,13 +284,15 @@ export default function SyncRecordingScreen() {
 
       case 'start_recording':
         console.log('🎯 Received start_recording message from server');
-        
+
         // If not already recording, start immediately with minimal delay for sync
         if (!isRecording) {
           console.log('🎬 Starting recording from sync command');
           setIsRecording(true);
-          setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
-          
+          setSession((prev) =>
+            prev ? { ...prev, status: 'recording' } : null
+          );
+
           // Small delay to ensure UI updates, then start recording
           setTimeout(() => {
             handleStartRecording(true);

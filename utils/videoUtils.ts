@@ -13,22 +13,24 @@ export interface VideoMetadata {
 export class VideoUtils {
   /**
    * Save video to device gallery with proper album organization
+   * On iOS: Uses MediaLibrary to save to Photos app
+   * On Android: Uses MediaLibrary to save to gallery (not cache)
    */
   static async saveToGallery(
-    videoUri: string, 
+    videoUri: string,
     albumName: string = 'Raydel Recordings'
   ): Promise<MediaLibrary.Asset | null> {
     try {
-      // Check permissions - request audio access explicitly for Android
+      // Request permissions on both platforms
       const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Storage permission is needed to save videos');
+        Alert.alert('Permission Required', 'Media library permission is needed to save videos to gallery');
         return null;
       }
 
-      // Create asset from video
+      // Create asset from video - this saves to gallery on both platforms
       const asset = await MediaLibrary.createAssetAsync(videoUri);
-      
+
       // Create or get album
       let album = await MediaLibrary.getAlbumAsync(albumName);
       if (!album) {
@@ -37,16 +39,18 @@ export class VideoUtils {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       }
 
+      console.log(`Video saved to gallery in album "${albumName}": ${asset.uri}`);
       return asset;
     } catch (error) {
-      console.error('Error saving video to gallery:', error);
-      Alert.alert('Save Error', 'Failed to save video to gallery');
+      console.error('Error saving video:', error);
+      Alert.alert('Save Error', 'Failed to save video to gallery. Please try again.');
       return null;
     }
   }
 
   /**
    * Get video metadata
+   * Uses MediaLibrary on both platforms
    */
   static async getVideoMetadata(videoUri: string): Promise<VideoMetadata | null> {
     try {
@@ -56,13 +60,13 @@ export class VideoUtils {
         fileSize?: number;
         size?: number;
       };
-      
+
       return {
         uri: videoUri,
         duration: assetInfo.duration || 0,
         width: assetInfo.width || 0,
         height: assetInfo.height || 0,
-  size: detailedInfo.fileSize ?? detailedInfo.size ?? 0,
+        size: detailedInfo.fileSize ?? detailedInfo.size ?? 0,
         filename: assetInfo.filename || 'video.mp4'
       };
     } catch (error) {
@@ -100,6 +104,7 @@ export class VideoUtils {
 
   /**
    * Validate video file
+   * Uses MediaLibrary on both platforms
    */
   static validateVideoFile(uri: string, maxSizeBytes: number = 2 * 1024 * 1024 * 1024): Promise<boolean> {
     return new Promise(async (resolve) => {
@@ -111,15 +116,15 @@ export class VideoUtils {
         }
 
         // Check file size
-        if (metadata.size > maxSizeBytes) {
+        if (metadata.size > 0 && metadata.size > maxSizeBytes) {
           Alert.alert('File Too Large', `Video file is too large. Maximum size is ${this.formatFileSize(maxSizeBytes)}`);
           resolve(false);
           return;
         }
 
-        // Check duration (minimum 10 seconds, maximum 2 hours)
-        if (metadata.duration < 10) {
-          Alert.alert('Video Too Short', 'Video must be at least 10 seconds long');
+        // Check duration (minimum 1 second, maximum 2 hours)
+        if (metadata.duration > 0 && metadata.duration < 1) {
+          Alert.alert('Video Too Short', 'Video must be at least 1 second long');
           resolve(false);
           return;
         }

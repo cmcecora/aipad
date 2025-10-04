@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -482,34 +483,49 @@ export default function SyncRecordingScreen() {
 
   const ensurePermissions = async (): Promise<boolean> => {
     try {
+      // Request camera permission explicitly
       if (!camPerm?.granted) {
         const camResult = await requestCamPerm();
         if (!camResult.granted) {
           Alert.alert(
             'Camera Permission Required',
-            'Please enable camera access to record videos.'
+            'Please enable camera access in your device settings to record videos.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
           );
           return false;
         }
       }
 
+      // Request microphone permission explicitly
       if (!micPerm?.granted) {
         const micResult = await requestMicPerm();
         if (!micResult.granted) {
           Alert.alert(
             'Microphone Permission Required',
-            'Please enable microphone access to record audio.'
+            'Please enable microphone access in your device settings to record audio.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
           );
           return false;
         }
       }
 
+      // Request media library permission on BOTH iOS and Android
       if (!mediaLibraryPerm?.granted) {
         const mediaResult = await requestMediaLibraryPerm();
         if (!mediaResult.granted) {
           Alert.alert(
-            'Storage Permission Required',
-            'Please enable storage access to save videos.'
+            'Media Library Permission Required',
+            'Please enable media library access in your device settings to save videos to gallery.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
           );
           return false;
         }
@@ -647,6 +663,7 @@ export default function SyncRecordingScreen() {
     try {
       console.log('💾 Saving recording:', videoUri);
 
+      // Save to gallery on both iOS and Android
       const asset = await MediaLibrary.createAssetAsync(videoUri);
 
       let album = await MediaLibrary.getAlbumAsync('Raydel Sync Recordings');
@@ -662,9 +679,7 @@ export default function SyncRecordingScreen() {
 
       Alert.alert(
         'Recording Saved',
-        `Synchronized recording saved to ${
-          Platform.OS === 'ios' ? 'Photos' : 'Gallery'
-        }!`,
+        'Synchronized recording saved to gallery in "Raydel Sync Recordings" album!',
         [
           {
             text: 'OK',

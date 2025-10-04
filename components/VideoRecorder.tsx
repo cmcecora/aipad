@@ -1,5 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  Linking,
+} from 'react-native';
 import {
   CameraView,
   useCameraPermissions,
@@ -36,6 +43,7 @@ export default function VideoRecorder({
   const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  // Always call the hook (React rules), but only use it on iOS
   const [mediaLibraryPerm, requestMediaLibraryPerm] =
     MediaLibrary.usePermissions();
 
@@ -78,29 +86,50 @@ export default function VideoRecorder({
 
   const requestAllPermissions = async (): Promise<boolean> => {
     try {
-      // Request camera permission
+      // Request camera permission explicitly
       if (!camPerm?.granted) {
         const camResult = await requestCamPerm();
         if (!camResult.granted) {
-          onError?.('Camera permission is required to record videos');
+          Alert.alert(
+            'Camera Permission Required',
+            'Please enable camera access in your device settings to record videos.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
+          );
           return false;
         }
       }
 
-      // Request microphone permission
+      // Request microphone permission explicitly
       if (!micPerm?.granted) {
         const micResult = await requestMicPerm();
         if (!micResult.granted) {
-          onError?.('Microphone permission is required to record audio');
+          Alert.alert(
+            'Microphone Permission Required',
+            'Please enable microphone access in your device settings to record audio.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
+          );
           return false;
         }
       }
 
-      // Request media library permission
+      // Request media library permission on BOTH iOS and Android
       if (!mediaLibraryPerm?.granted) {
         const mediaResult = await requestMediaLibraryPerm();
         if (!mediaResult.granted) {
-          onError?.('Storage permission is required to save videos');
+          Alert.alert(
+            'Media Library Permission Required',
+            'Please enable media library access in your device settings to save videos to gallery.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
+          );
           return false;
         }
       }
@@ -154,7 +183,7 @@ export default function VideoRecorder({
 
   const saveVideoToGallery = async (videoUri: string) => {
     try {
-      // Create asset from the recorded video
+      // Save to gallery on both iOS and Android
       const asset = await MediaLibrary.createAssetAsync(videoUri);
 
       // Create or get the Raydel Recordings album
@@ -169,6 +198,7 @@ export default function VideoRecorder({
         await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       }
 
+      console.log('Video saved to gallery in Raydel Recordings album');
       onRecordingComplete?.(videoUri);
     } catch (error) {
       console.error('Save error:', error);

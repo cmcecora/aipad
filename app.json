@@ -5,6 +5,12 @@
       "expo-font",
       "expo-web-browser",
       [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow access to your camera for video recording.",
@@ -17,10 +23,10 @@
         {
           "photosPermission": "Allow saving recorded videos to your photo library.",
           "savePhotosPermission": "Allow saving to your photo library.",
-          "isAccessMediaLocationEnabled": true,
-          "granularPermissions": ["photo", "video"]
+          "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "./plugins/remove-audio-permission.js"
     ],
     "android": {
       "permissions": [
@@ -31,8 +37,7 @@
         "android.permission.ACCESS_MEDIA_LOCATION",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "android.permission.READ_MEDIA_AUDIO"
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ],
       "package": "com.lfdemo.boltexponativewind"
     },
@@ -61,6 +66,12 @@
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "68275a79-73a9-453f-aa53-78060f1a43ca"
+      }
     }
   }
 }

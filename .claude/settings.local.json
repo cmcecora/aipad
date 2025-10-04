@@ -8,7 +8,8 @@
       "Bash(watchman watch-del-all:*)",
       "Bash(npx expo install:*)",
       "Bash(npx expo start:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(npx expo prebuild:*)"
     ],
     "deny": []
   }

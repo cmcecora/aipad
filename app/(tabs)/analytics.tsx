@@ -1,7 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Dimensions,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TrendingUp, Target, Clock, Award, Filter, Calendar, Activity, Users, Zap, Shield, Trophy, Medal, Crown, Minus, TrendingDown } from 'lucide-react-native';
+import {
+  TrendingUp,
+  Target,
+  Clock,
+  Award,
+  Filter,
+  Calendar,
+  Activity,
+  Users,
+  Zap,
+  Shield,
+  Trophy,
+  Medal,
+  Crown,
+  Minus,
+  TrendingDown,
+} from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -32,7 +55,7 @@ export default function AnalyticsScreen() {
     { key: 'shots', label: 'Shots' },
     { key: 'movement', label: 'Movement' },
     { key: 'analysis', label: 'Analysis' },
-    { key: 'rankings', label: 'Rankings' }
+    { key: 'rankings', label: 'Rankings' },
   ];
 
   const categories = [
@@ -42,91 +65,155 @@ export default function AnalyticsScreen() {
   ];
 
   const rankings = [
-    { rank: 1, name: 'Carlos Rodriguez', rating: 2156, change: 'up', avatar: '👑' },
+    {
+      rank: 1,
+      name: 'Carlos Rodriguez',
+      rating: 2156,
+      change: 'up',
+      avatar: '👑',
+    },
     { rank: 2, name: 'Maria Santos', rating: 2089, change: 'up', avatar: '🏆' },
-    { rank: 3, name: 'Juan Martinez', rating: 2034, change: 'down', avatar: '🥉' },
+    {
+      rank: 3,
+      name: 'Juan Martinez',
+      rating: 2034,
+      change: 'down',
+      avatar: '🥉',
+    },
     { rank: 4, name: 'Ana Gonzalez', rating: 1978, change: 'up', avatar: '🎾' },
-    { rank: 5, name: 'Pedro Silva', rating: 1923, change: 'same', avatar: '⚡' },
+    {
+      rank: 5,
+      name: 'Pedro Silva',
+      rating: 1923,
+      change: 'same',
+      avatar: '⚡',
+    },
     { rank: 6, name: 'Sofia Lopez', rating: 1887, change: 'up', avatar: '🔥' },
-    { rank: 7, name: 'Miguel Torres', rating: 1845, change: 'down', avatar: '⭐' },
+    {
+      rank: 7,
+      name: 'Miguel Torres',
+      rating: 1845,
+      change: 'down',
+      avatar: '⭐',
+    },
     { rank: 8, name: 'Laura Diaz', rating: 1789, change: 'up', avatar: '💪' },
-    { rank: 9, name: 'Roberto Cruz', rating: 1734, change: 'same', avatar: '🎯' },
+    {
+      rank: 9,
+      name: 'Roberto Cruz',
+      rating: 1734,
+      change: 'same',
+      avatar: '🎯',
+    },
     { rank: 10, name: 'Carmen Ruiz', rating: 1698, change: 'up', avatar: '🚀' },
   ];
 
   // Primary Technical Factors (70% Total Weight)
   const technicalFactors: TechnicalFactor[] = [
-    { 
-      title: 'Technical Execution', 
-      value: '87%', 
+    {
+      title: 'Technical Execution',
+      value: '87%',
       weight: '24.5%',
-      change: '+5%', 
+      change: '+5%',
       color: '#00D4FF',
-      description: 'Shot quality and form execution'
+      description: 'Shot quality and form execution',
     },
-    { 
-      title: 'Court Positioning', 
-      value: '82%', 
+    {
+      title: 'Court Positioning',
+      value: '82%',
       weight: '17.5%',
-      change: '+8%', 
+      change: '+8%',
       color: '#00FF88',
-      description: 'Strategic movement and coverage'
+      description: 'Strategic movement and coverage',
     },
-    { 
-      title: 'Shot Consistency', 
-      value: '79%', 
+    {
+      title: 'Shot Consistency',
+      value: '79%',
       weight: '17.5%',
-      change: '+12%', 
+      change: '+12%',
       color: '#FFD700',
-      description: 'Rally maintenance and rhythm'
+      description: 'Rally maintenance and rhythm',
     },
-    { 
-      title: 'Winners Impact', 
-      value: '91%', 
+    {
+      title: 'Winners Impact',
+      value: '91%',
       weight: '10.5%',
-      change: '+3%', 
+      change: '+3%',
       color: '#FF6B6B',
-      description: 'Decisive shot effectiveness'
+      description: 'Decisive shot effectiveness',
     },
   ];
 
   // Competitive Context Factors (30% Total Weight)
   const competitiveFactors = [
-    { 
-      title: 'Match Outcomes', 
-      value: '67%', 
+    {
+      title: 'Match Outcomes',
+      value: '67%',
       weight: '19.5%',
-      change: '+15%', 
+      change: '+15%',
       color: '#9D4EDD',
-      description: 'Games and sets performance'
+      description: 'Games and sets performance',
     },
-    { 
-      title: 'Opponent Differential', 
-      value: '+127', 
+    {
+      title: 'Opponent Differential',
+      value: '+127',
       weight: '10.5%',
-      change: '+23', 
+      change: '+23',
       color: '#FFA500',
-      description: 'Performance vs rating difference'
+      description: 'Performance vs rating difference',
     },
   ];
 
   // Detailed Performance Metrics
   const performanceMetrics = [
-    { metric: 'Technical Score', value: '2.1', target: '2.5', unit: 'pts/shot' },
+    {
+      metric: 'Technical Score',
+      value: '2.1',
+      target: '2.5',
+      unit: 'pts/shot',
+    },
     { metric: 'Court Coverage', value: '85%', target: '90%', unit: '' },
     { metric: 'Strategic Movement', value: '78%', target: '85%', unit: '' },
     { metric: 'Recovery Efficiency', value: '82%', target: '88%', unit: '' },
     { metric: 'Pressure Performance', value: '74%', target: '80%', unit: '' },
     { metric: 'Unforced Error Rate', value: '12%', target: '8%', unit: '' },
-    { metric: 'Rally Maintenance', value: '3.2', target: '4.0', unit: 'avg length' },
+    {
+      metric: 'Rally Maintenance',
+      value: '3.2',
+      target: '4.0',
+      unit: 'avg length',
+    },
     { metric: 'Rhythm Breaking', value: '18', target: '25', unit: 'per match' },
   ];
 
   const shotBreakdown = [
-    { type: 'Perfect Execution', count: 89, percentage: 31, points: '+2.0', color: '#00FF88' },
-    { type: 'Good Form', count: 142, percentage: 49, points: '+1.0', color: '#00D4FF' },
-    { type: 'Minor Errors', count: 43, percentage: 15, points: '-0.5', color: '#FFD700' },
-    { type: 'Major Errors', count: 15, percentage: 5, points: '-1.0', color: '#FF6B6B' },
+    {
+      type: 'Perfect Execution',
+      count: 89,
+      percentage: 31,
+      points: '+2.0',
+      color: '#00FF88',
+    },
+    {
+      type: 'Good Form',
+      count: 142,
+      percentage: 49,
+      points: '+1.0',
+      color: '#00D4FF',
+    },
+    {
+      type: 'Minor Errors',
+      count: 43,
+      percentage: 15,
+      points: '-0.5',
+      color: '#FFD700',
+    },
+    {
+      type: 'Major Errors',
+      count: 15,
+      percentage: 5,
+      points: '-1.0',
+      color: '#FF6B6B',
+    },
   ];
 
   const getRatingColor = (rating: number) => {
@@ -139,9 +226,10 @@ export default function AnalyticsScreen() {
   const getMetricColor = (current: string, target: string) => {
     const currentVal = parseFloat(current.replace('%', ''));
     const targetVal = parseFloat(target.replace('%', ''));
-    
+
     if (current.includes('%') && currentVal >= targetVal) return '#00FF88';
-    if (current.includes('%') && currentVal >= targetVal * 0.8) return '#FFD700';
+    if (current.includes('%') && currentVal >= targetVal * 0.8)
+      return '#FFD700';
     return '#FF6B6B';
   };
 
@@ -154,9 +242,12 @@ export default function AnalyticsScreen() {
 
   const getChangeIcon = (change: string) => {
     switch (change) {
-      case 'up': return <TrendingUp size={16} color="#00FF88" />;
-      case 'down': return <TrendingDown size={16} color="#FF6B6B" />;
-      default: return <Minus size={16} color="#888" />;
+      case 'up':
+        return <TrendingUp size={16} color="#00FF88" />;
+      case 'down':
+        return <TrendingDown size={16} color="#FF6B6B" />;
+      default:
+        return <Minus size={16} color="#888" />;
     }
   };
 
@@ -178,7 +269,9 @@ export default function AnalyticsScreen() {
                     <TrendingUp size={16} color="#00FF88" />
                     <Text style={styles.ratingChangeText}>+47 this month</Text>
                   </View>
-                  <Text style={styles.ratingLevel}>High Intermediate (4.0-4.5)</Text>
+                  <Text style={styles.ratingLevel}>
+                    High Intermediate (4.0-4.5)
+                  </Text>
                 </LinearGradient>
               </View>
             </View>
@@ -191,32 +284,45 @@ export default function AnalyticsScreen() {
                   <Text style={styles.weightText}>70% Total Weight</Text>
                 </View>
               </View>
-              
+
               {technicalFactors.map((factor, index) => (
                 <View key={index} style={styles.factorCard}>
                   <View style={styles.factorHeader}>
                     <View style={styles.factorTitleRow}>
                       <Text style={styles.factorTitle}>{factor.title}</Text>
-                      <View style={[styles.weightIndicator, { backgroundColor: factor.color }]}>
-                        <Text style={styles.weightIndicatorText}>{factor.weight}</Text>
+                      <View
+                        style={[
+                          styles.weightIndicator,
+                          { backgroundColor: factor.color },
+                        ]}
+                      >
+                        <Text style={styles.weightIndicatorText}>
+                          {factor.weight}
+                        </Text>
                       </View>
                     </View>
-                    <Text style={styles.factorDescription}>{factor.description}</Text>
+                    <Text style={styles.factorDescription}>
+                      {factor.description}
+                    </Text>
                   </View>
-                  
+
                   <View style={styles.factorMetrics}>
-                    <Text style={[styles.factorValue, { color: factor.color }]}>{factor.value}</Text>
-                    <Text style={[styles.factorChange, { color: '#00FF88' }]}>{factor.change}</Text>
+                    <Text style={[styles.factorValue, { color: factor.color }]}>
+                      {factor.value}
+                    </Text>
+                    <Text style={[styles.factorChange, { color: '#00FF88' }]}>
+                      {factor.change}
+                    </Text>
                   </View>
-                  
+
                   <View style={styles.progressBar}>
-                    <View 
+                    <View
                       style={[
                         styles.progressFill,
-                        { 
+                        {
                           width: factor.value,
-                          backgroundColor: factor.color
-                        }
+                          backgroundColor: factor.color,
+                        },
                       ]}
                     />
                   </View>
@@ -232,22 +338,35 @@ export default function AnalyticsScreen() {
                   <Text style={styles.weightText}>30% Total Weight</Text>
                 </View>
               </View>
-              
+
               {competitiveFactors.map((factor, index) => (
                 <View key={index} style={styles.factorCard}>
                   <View style={styles.factorHeader}>
                     <View style={styles.factorTitleRow}>
                       <Text style={styles.factorTitle}>{factor.title}</Text>
-                      <View style={[styles.weightIndicator, { backgroundColor: factor.color }]}>
-                        <Text style={styles.weightIndicatorText}>{factor.weight}</Text>
+                      <View
+                        style={[
+                          styles.weightIndicator,
+                          { backgroundColor: factor.color },
+                        ]}
+                      >
+                        <Text style={styles.weightIndicatorText}>
+                          {factor.weight}
+                        </Text>
                       </View>
                     </View>
-                    <Text style={styles.factorDescription}>{factor.description}</Text>
+                    <Text style={styles.factorDescription}>
+                      {factor.description}
+                    </Text>
                   </View>
-                  
+
                   <View style={styles.factorMetrics}>
-                    <Text style={[styles.factorValue, { color: factor.color }]}>{factor.value}</Text>
-                    <Text style={[styles.factorChange, { color: '#00FF88' }]}>{factor.change}</Text>
+                    <Text style={[styles.factorValue, { color: factor.color }]}>
+                      {factor.value}
+                    </Text>
+                    <Text style={[styles.factorChange, { color: '#00FF88' }]}>
+                      {factor.change}
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -267,22 +386,26 @@ export default function AnalyticsScreen() {
                     <Text style={styles.shotType}>{shot.type}</Text>
                     <View style={styles.shotMetrics}>
                       <Text style={styles.shotCount}>{shot.count} shots</Text>
-                      <Text style={[styles.shotPoints, { color: shot.color }]}>{shot.points} pts</Text>
+                      <Text style={[styles.shotPoints, { color: shot.color }]}>
+                        {shot.points} pts
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.shotProgress}>
                     <View style={styles.shotProgressBar}>
-                      <View 
+                      <View
                         style={[
                           styles.shotProgressFill,
-                          { 
+                          {
                             width: `${shot.percentage}%`,
-                            backgroundColor: shot.color
-                          }
+                            backgroundColor: shot.color,
+                          },
                         ]}
                       />
                     </View>
-                    <Text style={styles.shotPercentage}>{shot.percentage}%</Text>
+                    <Text style={styles.shotPercentage}>
+                      {shot.percentage}%
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -292,11 +415,46 @@ export default function AnalyticsScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Shot Type Breakdown</Text>
               {[
-                { type: 'Forehands', count: 142, winners: 18, errors: 8, accuracy: 94, color: '#00D4FF' },
-                { type: 'Backhands', count: 98, winners: 12, errors: 6, accuracy: 92, color: '#00FF88' },
-                { type: 'Volleys', count: 23, winners: 3, errors: 2, accuracy: 87, color: '#FFD700' },
-                { type: 'Smashes', count: 14, winners: 1, errors: 1, accuracy: 86, color: '#FF6B6B' },
-                { type: 'Serves', count: 10, winners: 0, errors: 1, accuracy: 90, color: '#9D4EDD' }
+                {
+                  type: 'Forehands',
+                  count: 142,
+                  winners: 18,
+                  errors: 8,
+                  accuracy: 94,
+                  color: '#00D4FF',
+                },
+                {
+                  type: 'Backhands',
+                  count: 98,
+                  winners: 12,
+                  errors: 6,
+                  accuracy: 92,
+                  color: '#00FF88',
+                },
+                {
+                  type: 'Volleys',
+                  count: 23,
+                  winners: 3,
+                  errors: 2,
+                  accuracy: 87,
+                  color: '#FFD700',
+                },
+                {
+                  type: 'Smashes',
+                  count: 14,
+                  winners: 1,
+                  errors: 1,
+                  accuracy: 86,
+                  color: '#FF6B6B',
+                },
+                {
+                  type: 'Serves',
+                  count: 10,
+                  winners: 0,
+                  errors: 1,
+                  accuracy: 90,
+                  color: '#9D4EDD',
+                },
               ].map((shot, index) => (
                 <View key={index} style={styles.shotTypeCard}>
                   <View style={styles.shotTypeHeader}>
@@ -305,28 +463,37 @@ export default function AnalyticsScreen() {
                   </View>
                   <View style={styles.shotTypeStats}>
                     <View style={styles.shotTypeStat}>
-                      <Text style={styles.shotTypeStatValue}>{shot.winners}</Text>
+                      <Text style={styles.shotTypeStatValue}>
+                        {shot.winners}
+                      </Text>
                       <Text style={styles.shotTypeStatLabel}>Winners</Text>
                     </View>
                     <View style={styles.shotTypeStat}>
-                      <Text style={styles.shotTypeStatValue}>{shot.errors}</Text>
+                      <Text style={styles.shotTypeStatValue}>
+                        {shot.errors}
+                      </Text>
                       <Text style={styles.shotTypeStatLabel}>Errors</Text>
                     </View>
                     <View style={styles.shotTypeStat}>
-                      <Text style={[styles.shotTypeStatValue, { color: shot.color }]}>
+                      <Text
+                        style={[
+                          styles.shotTypeStatValue,
+                          { color: shot.color },
+                        ]}
+                      >
                         {shot.accuracy}%
                       </Text>
                       <Text style={styles.shotTypeStatLabel}>Accuracy</Text>
                     </View>
                   </View>
                   <View style={styles.accuracyBar}>
-                    <View 
+                    <View
                       style={[
                         styles.accuracyFill,
-                        { 
+                        {
                           width: `${shot.accuracy}%`,
-                          backgroundColor: shot.color
-                        }
+                          backgroundColor: shot.color,
+                        },
                       ]}
                     />
                   </View>
@@ -341,16 +508,22 @@ export default function AnalyticsScreen() {
           <View>
             {/* Court Movement Analysis */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Court Positioning Analysis</Text>
+              <Text style={styles.sectionTitle}>
+                Court Positioning Analysis
+              </Text>
               <View style={styles.heatmapCard}>
                 <View style={styles.heatmapContainer}>
-                  <Text style={styles.heatmapTitle}>Court Coverage Heatmap</Text>
+                  <Text style={styles.heatmapTitle}>
+                    Court Coverage Heatmap
+                  </Text>
                   <View style={styles.heatmapPlaceholder}>
-                    <Text style={styles.heatmapText}>Movement heatmap visualization</Text>
+                    <Text style={styles.heatmapText}>
+                      Movement heatmap visualization
+                    </Text>
                   </View>
                 </View>
               </View>
-              
+
               <View style={styles.movementStats}>
                 <View style={styles.movementStat}>
                   <Text style={styles.movementValue}>85%</Text>
@@ -373,17 +546,23 @@ export default function AnalyticsScreen() {
               <View style={styles.positionBreakdown}>
                 <View style={styles.positionComponent}>
                   <Text style={styles.positionTitle}>Court Coverage</Text>
-                  <Text style={styles.positionWeight}>40% of Position Score</Text>
+                  <Text style={styles.positionWeight}>
+                    40% of Position Score
+                  </Text>
                   <Text style={styles.positionValue}>85%</Text>
                 </View>
                 <View style={styles.positionComponent}>
                   <Text style={styles.positionTitle}>Strategic Movement</Text>
-                  <Text style={styles.positionWeight}>30% of Position Score</Text>
+                  <Text style={styles.positionWeight}>
+                    30% of Position Score
+                  </Text>
                   <Text style={styles.positionValue}>78%</Text>
                 </View>
                 <View style={styles.positionComponent}>
                   <Text style={styles.positionTitle}>Recovery Efficiency</Text>
-                  <Text style={styles.positionWeight}>30% of Position Score</Text>
+                  <Text style={styles.positionWeight}>
+                    30% of Position Score
+                  </Text>
                   <Text style={styles.positionValue}>82%</Text>
                 </View>
               </View>
@@ -397,26 +576,32 @@ export default function AnalyticsScreen() {
             {/* AI-Powered Insights */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>AI-Powered Insights</Text>
-              
+
               <View style={styles.insightCard}>
                 <View style={styles.insightHeader}>
                   <Award size={20} color="#00FF88" />
-                  <Text style={styles.insightTitle}>Strongest Technical Factor</Text>
+                  <Text style={styles.insightTitle}>
+                    Strongest Technical Factor
+                  </Text>
                 </View>
                 <Text style={styles.insightValue}>Winners Impact (91%)</Text>
                 <Text style={styles.insightDescription}>
-                  Exceptional performance in decisive moments. Your ability to execute winners under pressure is elite-level.
+                  Exceptional performance in decisive moments. Your ability to
+                  execute winners under pressure is elite-level.
                 </Text>
               </View>
 
               <View style={styles.insightCard}>
                 <View style={styles.insightHeader}>
                   <Target size={20} color="#FFD700" />
-                  <Text style={styles.insightTitle}>Primary Improvement Area</Text>
+                  <Text style={styles.insightTitle}>
+                    Primary Improvement Area
+                  </Text>
                 </View>
                 <Text style={styles.insightValue}>Shot Consistency (79%)</Text>
                 <Text style={styles.insightDescription}>
-                  Focus on reducing unforced errors and maintaining rally length. 13% improvement potential to reach target.
+                  Focus on reducing unforced errors and maintaining rally
+                  length. 13% improvement potential to reach target.
                 </Text>
               </View>
 
@@ -427,7 +612,8 @@ export default function AnalyticsScreen() {
                 </View>
                 <Text style={styles.insightValue}>1620 by Month End</Text>
                 <Text style={styles.insightDescription}>
-                  Current trajectory suggests advancement to Advanced level (5.0) within 4-6 weeks with consistent performance.
+                  Current trajectory suggests advancement to Advanced level
+                  (5.0) within 4-6 weeks with consistent performance.
                 </Text>
               </View>
 
@@ -438,7 +624,8 @@ export default function AnalyticsScreen() {
                 </View>
                 <Text style={styles.insightValue}>+127 vs Opponents</Text>
                 <Text style={styles.insightDescription}>
-                  Strong performance against higher-rated players. Your rating gains are accelerated by quality of opposition.
+                  Strong performance against higher-rated players. Your rating
+                  gains are accelerated by quality of opposition.
                 </Text>
               </View>
             </View>
@@ -451,13 +638,22 @@ export default function AnalyticsScreen() {
                   <View key={index} style={styles.metricCard}>
                     <Text style={styles.metricTitle}>{metric.metric}</Text>
                     <View style={styles.metricValues}>
-                      <Text style={[styles.metricCurrent, { color: getMetricColor(metric.value, metric.target) }]}>
+                      <Text
+                        style={[
+                          styles.metricCurrent,
+                          {
+                            color: getMetricColor(metric.value, metric.target),
+                          },
+                        ]}
+                      >
                         {metric.value}
                       </Text>
                       <Text style={styles.metricUnit}>{metric.unit}</Text>
                     </View>
                     <View style={styles.metricTarget}>
-                      <Text style={styles.metricTargetLabel}>Target: {metric.target}</Text>
+                      <Text style={styles.metricTargetLabel}>
+                        Target: {metric.target}
+                      </Text>
                     </View>
                   </View>
                 ))}
@@ -494,15 +690,14 @@ export default function AnalyticsScreen() {
               {categories.map((category) => (
                 <TouchableOpacity
                   key={category.key}
-                  style={[
-                    styles.categoryButton,
-                    styles.categoryButtonActive
-                  ]}
+                  style={[styles.categoryButton, styles.categoryButtonActive]}
                 >
-                  <Text style={[
-                    styles.categoryButtonText,
-                    styles.categoryButtonTextActive
-                  ]}>
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      styles.categoryButtonTextActive,
+                    ]}
+                  >
                     {category.label}
                   </Text>
                 </TouchableOpacity>
@@ -515,7 +710,9 @@ export default function AnalyticsScreen() {
               <View style={styles.podium}>
                 {/* 2nd Place */}
                 <View style={styles.podiumPosition}>
-                  <View style={[styles.podiumRank, { backgroundColor: '#C0C0C0' }]}>
+                  <View
+                    style={[styles.podiumRank, { backgroundColor: '#C0C0C0' }]}
+                  >
                     <Text style={styles.podiumRankText}>2</Text>
                   </View>
                   <Text style={styles.podiumName}>{rankings[1].name}</Text>
@@ -524,7 +721,9 @@ export default function AnalyticsScreen() {
 
                 {/* 1st Place */}
                 <View style={[styles.podiumPosition, styles.podiumWinner]}>
-                  <View style={[styles.podiumRank, { backgroundColor: '#FFD700' }]}>
+                  <View
+                    style={[styles.podiumRank, { backgroundColor: '#FFD700' }]}
+                  >
                     <Crown size={20} color="#000" />
                   </View>
                   <Text style={styles.podiumName}>{rankings[0].name}</Text>
@@ -533,7 +732,9 @@ export default function AnalyticsScreen() {
 
                 {/* 3rd Place */}
                 <View style={styles.podiumPosition}>
-                  <View style={[styles.podiumRank, { backgroundColor: '#CD7F32' }]}>
+                  <View
+                    style={[styles.podiumRank, { backgroundColor: '#CD7F32' }]}
+                  >
                     <Text style={styles.podiumRankText}>3</Text>
                   </View>
                   <Text style={styles.podiumName}>{rankings[2].name}</Text>
@@ -548,22 +749,32 @@ export default function AnalyticsScreen() {
               {rankings.map((player, index) => (
                 <View key={index} style={styles.playerCard}>
                   <View style={styles.playerRank}>
-                    <View style={[styles.rankCircle, { backgroundColor: getRankingColor(player.rank) }]}>
+                    <View
+                      style={[
+                        styles.rankCircle,
+                        { backgroundColor: getRankingColor(player.rank) },
+                      ]}
+                    >
                       <Text style={styles.rankText}>{player.rank}</Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.playerAvatar}>
                     <Text style={styles.avatarEmoji}>{player.avatar}</Text>
                   </View>
-                  
+
                   <View style={styles.playerInfo}>
                     <Text style={styles.playerName}>{player.name}</Text>
-                    <Text style={[styles.playerRating, { color: getRatingColor(player.rating) }]}>
+                    <Text
+                      style={[
+                        styles.playerRating,
+                        { color: getRatingColor(player.rating) },
+                      ]}
+                    >
                       {player.rating} Rating
                     </Text>
                   </View>
-                  
+
                   <View style={styles.playerChange}>
                     {getChangeIcon(player.change)}
                   </View>
@@ -574,7 +785,7 @@ export default function AnalyticsScreen() {
             {/* Achievement Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Recent Achievements</Text>
-              
+
               <View style={styles.achievementCard}>
                 <View style={styles.achievementIcon}>
                   <Medal size={24} color="#FFD700" />
@@ -592,7 +803,9 @@ export default function AnalyticsScreen() {
                   <TrendingUp size={24} color="#00FF88" />
                 </View>
                 <View style={styles.achievementContent}>
-                  <Text style={styles.achievementTitle}>Consistency Streak</Text>
+                  <Text style={styles.achievementTitle}>
+                    Consistency Streak
+                  </Text>
                   <Text style={styles.achievementDescription}>
                     8 consecutive matches with improving performance
                   </Text>
@@ -610,12 +823,11 @@ export default function AnalyticsScreen() {
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#1a1a1a', '#2a2a2a']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#1a1a1a', '#2a2a2a']} style={styles.header}>
         <Text style={styles.headerTitle}>Raydel Analytics</Text>
-        <Text style={styles.headerSubtitle}>Comprehensive Performance Evaluation</Text>
+        <Text style={styles.headerSubtitle}>
+          Comprehensive Performance Evaluation
+        </Text>
       </LinearGradient>
 
       {/* Tab Navigation */}
@@ -623,16 +835,15 @@ export default function AnalyticsScreen() {
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
-            style={[
-              styles.tab,
-              selectedTab === tab.key && styles.tabActive
-            ]}
+            style={[styles.tab, selectedTab === tab.key && styles.tabActive]}
             onPress={() => setSelectedTab(tab.key)}
           >
-            <Text style={[
-              styles.tabText,
-              selectedTab === tab.key && styles.tabTextActive
-            ]}>
+            <Text
+              style={[
+                styles.tabText,
+                selectedTab === tab.key && styles.tabTextActive,
+              ]}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -640,9 +851,7 @@ export default function AnalyticsScreen() {
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
-        {renderTabContent()}
-      </View>
+      <View style={styles.content}>{renderTabContent()}</View>
     </ScrollView>
   );
 }
