@@ -19,7 +19,19 @@ export interface SyncSession {
 }
 
 export interface SyncMessage {
-  type: 'join' | 'start_recording' | 'stop_recording' | 'device_connected' | 'device_disconnected' | 'error' | 'ping' | 'pong' | 'time_sync_request' | 'time_sync_update';
+  type:
+    | 'join'
+    | 'joined'
+    | 'start_recording'
+    | 'stop_recording'
+    | 'device_connected'
+    | 'device_disconnected'
+    | 'error'
+    | 'ping'
+    | 'pong'
+    | 'time_sync_request'
+    | 'time_sync_response'
+    | 'time_sync_update';
   sessionId?: string;
   deviceId?: string;
   deviceName?: string;
@@ -34,6 +46,7 @@ export interface SyncMessage {
   offset_ms?: number;
   latency_ms?: number;
   atomic_start_time?: number;
+  client_timestamp?: number;
 }
 
 export class SyncManager {
@@ -41,7 +54,7 @@ export class SyncManager {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private pingInterval: NodeJS.Timeout | null = null;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
   private serverUrl: string;
   private clockOffsetMs = 0; // server_time ≈ local_time - offset
   private latencyMs = 0;
@@ -299,11 +312,11 @@ export class SyncManager {
         // Reply immediately with local timestamp
         if (message.request_id && typeof message.server_timestamp === 'number') {
           this.sendMessage({
-            type: 'time_sync_response' as any,
+            type: 'time_sync_response',
             request_id: message.request_id,
             server_timestamp: message.server_timestamp,
-            client_timestamp: Date.now() as any
-          } as any);
+            client_timestamp: Date.now()
+          });
         }
         break;
 

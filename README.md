@@ -33,6 +33,25 @@ When the dev server starts, use the on-screen prompts:
 - **Build for web (static export)**: `npm run build:web`
 - **Lint**: `npm run lint`
 
+### Build on an Android device
+
+1. Install Android Studio and ensure the Android SDK, platform tools, and an emulator or physical device with USB debugging are available.
+2. If you are using a real device, enable **Developer options → USB debugging**, then connect it via USB and run `adb devices` to verify it is detected.
+3. From the project root, install native dependencies and build the Android binary:
+
+   ```bash
+   npm run android
+   ```
+
+   This runs `expo run:android`, producing a debug build that is installed on the connected device/emulator.
+4. For a release-signed build, first configure signing in `android/app/build.gradle`, then run:
+
+   ```bash
+   npx expo run:android --variant release
+   ```
+
+   The resulting APK/AAB is located under `android/app/build/outputs/` and can be side-loaded or uploaded to a store.
+
 ### Notes
 
 - This app uses **expo-router**; routes live under the `app/` directory.

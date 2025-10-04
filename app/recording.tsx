@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  Play, 
-  Pause, 
-  Square, 
-  Camera, 
-  Wifi, 
+import {
+  Play,
+  Pause,
+  Square,
+  Camera,
+  Wifi,
   WifiOff,
   Clock,
   Users,
   Target,
-  Activity
+  Activity,
 } from 'lucide-react-native';
 import { router } from 'expo-router';
 
@@ -26,23 +26,29 @@ export default function RecordingScreen() {
     totalShots: 0,
     winners: 0,
     errors: 0,
-    rallies: 0
+    rallies: 0,
   });
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (isRecording && !isPaused) {
       interval = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime((prev) => prev + 1);
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [isRecording, isPaused]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
   };
 
   const handleStartRecording = () => {
@@ -50,11 +56,11 @@ export default function RecordingScreen() {
     setIsPaused(false);
     // Simulate live stats updates
     const statsInterval = setInterval(() => {
-      setLiveStats(prev => ({
+      setLiveStats((prev) => ({
         totalShots: prev.totalShots + Math.floor(Math.random() * 3),
         winners: prev.winners + (Math.random() > 0.8 ? 1 : 0),
         errors: prev.errors + (Math.random() > 0.7 ? 1 : 0),
-        rallies: prev.rallies + (Math.random() > 0.9 ? 1 : 0)
+        rallies: prev.rallies + (Math.random() > 0.9 ? 1 : 0),
       }));
     }, 2000);
   };
@@ -69,33 +75,30 @@ export default function RecordingScreen() {
       'Are you sure you want to stop recording? This will end the current match.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Stop', 
-          style: 'destructive', 
+        {
+          text: 'Stop',
+          style: 'destructive',
           onPress: () => {
             setIsRecording(false);
             setIsPaused(false);
             router.push('/report/1');
-          }
-        }
+          },
+        },
       ]
     );
   };
 
   const handleScoreUpdate = (team: 'team1' | 'team2', increment: number) => {
-    setScore(prev => ({
+    setScore((prev) => ({
       ...prev,
-      [team]: Math.max(0, prev[team] + increment)
+      [team]: Math.max(0, prev[team] + increment),
     }));
   };
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#1a1a1a', '#2a2a2a']}
-        style={styles.header}
-      >
+      <LinearGradient colors={['#1a1a1a', '#2a2a2a']} style={styles.header}>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Live Recording</Text>
           <View style={styles.connectionStatus}>
@@ -104,7 +107,12 @@ export default function RecordingScreen() {
             ) : (
               <WifiOff size={16} color="#FF6B6B" />
             )}
-            <Text style={[styles.connectionText, { color: isConnected ? '#00FF88' : '#FF6B6B' }]}>
+            <Text
+              style={[
+                styles.connectionText,
+                { color: isConnected ? '#00FF88' : '#FF6B6B' },
+              ]}
+            >
               {isConnected ? 'Connected' : 'Offline'}
             </Text>
           </View>
@@ -116,18 +124,23 @@ export default function RecordingScreen() {
         <View style={styles.videoArea}>
           <View style={styles.videoOverlay}>
             <View style={styles.recordingIndicator}>
-              <View style={[styles.recordingDot, { backgroundColor: isRecording ? '#FF6B6B' : '#666' }]} />
+              <View
+                style={[
+                  styles.recordingDot,
+                  { backgroundColor: isRecording ? '#FF6B6B' : '#666' },
+                ]}
+              />
               <Text style={styles.recordingText}>
                 {isRecording ? (isPaused ? 'PAUSED' : 'RECORDING') : 'STOPPED'}
               </Text>
             </View>
-            
+
             <View style={styles.timerContainer}>
               <Clock size={16} color="#fff" />
               <Text style={styles.timerText}>{formatTime(recordingTime)}</Text>
             </View>
           </View>
-          
+
           {/* AI Analysis Overlay */}
           <View style={styles.aiOverlay}>
             <View style={styles.playerTracker}>
@@ -138,7 +151,7 @@ export default function RecordingScreen() {
                 <Text style={styles.playerLabel}>P2</Text>
               </View>
             </View>
-            
+
             <View style={styles.ballTracker}>
               <View style={styles.ballDot} />
             </View>
@@ -151,14 +164,14 @@ export default function RecordingScreen() {
         <View style={styles.scoreSection}>
           <Text style={styles.scoreLabel}>Team 1</Text>
           <View style={styles.scoreControls}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.scoreButton}
               onPress={() => handleScoreUpdate('team1', -1)}
             >
               <Text style={styles.scoreButtonText}>-</Text>
             </TouchableOpacity>
             <Text style={styles.scoreValue}>{score.team1}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.scoreButton}
               onPress={() => handleScoreUpdate('team1', 1)}
             >
@@ -174,14 +187,14 @@ export default function RecordingScreen() {
         <View style={styles.scoreSection}>
           <Text style={styles.scoreLabel}>Team 2</Text>
           <View style={styles.scoreControls}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.scoreButton}
               onPress={() => handleScoreUpdate('team2', -1)}
             >
               <Text style={styles.scoreButtonText}>-</Text>
             </TouchableOpacity>
             <Text style={styles.scoreValue}>{score.team2}</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.scoreButton}
               onPress={() => handleScoreUpdate('team2', 1)}
             >
@@ -221,7 +234,7 @@ export default function RecordingScreen() {
       {/* Control Buttons */}
       <View style={styles.controlButtons}>
         {!isRecording ? (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.startButton}
             onPress={handleStartRecording}
           >
@@ -235,22 +248,28 @@ export default function RecordingScreen() {
           </TouchableOpacity>
         ) : (
           <View style={styles.recordingControls}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.controlButton}
               onPress={handlePauseRecording}
             >
               <LinearGradient
-                colors={isPaused ? ['#00D4FF', '#0099CC'] : ['#FFD700', '#FFA500']}
+                colors={
+                  isPaused ? ['#00D4FF', '#0099CC'] : ['#FFD700', '#FFA500']
+                }
                 style={styles.controlButtonGradient}
               >
-                {isPaused ? <Play size={20} color="#fff" /> : <Pause size={20} color="#fff" />}
+                {isPaused ? (
+                  <Play size={20} color="#fff" />
+                ) : (
+                  <Pause size={20} color="#fff" />
+                )}
                 <Text style={styles.controlButtonText}>
                   {isPaused ? 'Resume' : 'Pause'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.controlButton}
               onPress={handleStopRecording}
             >

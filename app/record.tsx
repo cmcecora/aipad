@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,13 +28,24 @@ import {
 } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import Constants from 'expo-constants';
 
 export default function RecordScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  const mediaLibraryPermissionOptions = useMemo(() => {
+    if (Platform.OS !== 'android') {
+      return undefined;
+    }
+    const androidGranularPermissions: MediaLibrary.GranularPermission[] = [
+      'photo',
+      'video',
+    ];
+    return { granularPermissions: androidGranularPermissions };
+  }, []);
   const [mediaLibraryPerm, requestMediaLibraryPerm] =
-    MediaLibrary.usePermissions();
+    MediaLibrary.usePermissions(mediaLibraryPermissionOptions);
 
   const [isRecording, setIsRecording] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -102,10 +113,23 @@ export default function RecordScreen() {
       return true;
     } catch (error) {
       console.error('Permission request error:', error);
-      Alert.alert(
-        'Permission Error',
-        'Failed to request permissions. Please try again.'
-      );
+      const audioPermissionError =
+        error instanceof Error && /AUDIO permission/i.test(error.message || '');
+      if (
+        Platform.OS === 'android' &&
+        Constants.appOwnership === 'expo' &&
+        audioPermissionError
+      ) {
+        Alert.alert(
+          'Build Required',
+          'Expo Go does not include the Android audio media permission. Create a development build (expo prebuild + run) to test full media-library access.'
+        );
+      } else {
+        Alert.alert(
+          'Permission Error',
+          'Failed to request permissions. Please try again.'
+        );
+      }
       return false;
     }
   };

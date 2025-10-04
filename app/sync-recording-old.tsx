@@ -55,12 +55,17 @@ export default function SyncRecordingScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [shouldShowCamera, setShouldShowCamera] = useState(false);
   const [otherDeviceCameraReady, setOtherDeviceCameraReady] = useState(false);
-  const [isRecordingAttemptInProgress, setIsRecordingAttemptInProgress] = useState(false);
+  const [isRecordingAttemptInProgress, setIsRecordingAttemptInProgress] =
+    useState(false);
 
   const cameraRef = useRef<CameraView>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cameraInitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const cameraIsRecordingRef = useRef(false);
+  const pendingStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
 
@@ -81,6 +86,10 @@ export default function SyncRecordingScreen() {
       if (cameraInitTimeoutRef.current) {
         clearTimeout(cameraInitTimeoutRef.current);
       }
+      if (pendingStartTimeoutRef.current) {
+        clearTimeout(pendingStartTimeoutRef.current);
+      }
+      cameraIsRecordingRef.current = false;
     };
   }, []);
 
@@ -275,13 +284,15 @@ export default function SyncRecordingScreen() {
 
       case 'start_recording':
         console.log('🎯 Received start_recording message from server');
-        
+
         // If not already recording, start immediately with minimal delay for sync
         if (!isRecording) {
           console.log('🎬 Starting recording from sync command');
           setIsRecording(true);
-          setSession((prev) => (prev ? { ...prev, status: 'recording' } : null));
-          
+          setSession((prev) =>
+            prev ? { ...prev, status: 'recording' } : null
+          );
+
           // Small delay to ensure UI updates, then start recording
           setTimeout(() => {
             handleStartRecording(true);
@@ -537,9 +548,13 @@ export default function SyncRecordingScreen() {
               retryCount + 1
             }/3 in 300ms...`
           );
-          setTimeout(() => {
+          if (pendingStartTimeoutRef.current) {
+            clearTimeout(pendingStartTimeoutRef.current);
+          }
+          pendingStartTimeoutRef.current = setTimeout(() => {
             setIsRecordingAttemptInProgress(false);
             handleStartRecording(true, retryCount + 1);
+            pendingStartTimeoutRef.current = null;
           }, 300);
           return;
         } else {

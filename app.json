@@ -1,9 +1,15 @@
 {
   "expo": {
     "plugins": [
-      "expo-router", 
-      "expo-font", 
+      "expo-router",
+      "expo-font",
       "expo-web-browser",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
       [
         "expo-camera",
         {
@@ -17,10 +23,10 @@
         {
           "photosPermission": "Allow saving recorded videos to your photo library.",
           "savePhotosPermission": "Allow saving to your photo library.",
-          "isAccessMediaLocationEnabled": true,
-          "androidWriteOnly": false
+          "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "./plugins/remove-audio-permission.js"
     ],
     "android": {
       "permissions": [
@@ -29,10 +35,15 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.ACCESS_MEDIA_LOCATION",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+      ],
+      "package": "com.lfdemo.boltexponativewind"
     },
     "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lfdemo.boltexponativewind",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera to record padel matches for analysis.",
         "NSMicrophoneUsageDescription": "This app needs access to microphone to record audio during matches.",
@@ -48,9 +59,6 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
     "web": {
       "bundler": "metro",
       "output": "single",
@@ -58,6 +66,12 @@
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "68275a79-73a9-453f-aa53-78060f1a43ca"
+      }
     }
   }
 }

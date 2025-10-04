@@ -1,12 +1,22 @@
 import { useState, useRef, useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Alert, Platform, Linking } from 'react-native';
+import { CameraView, useCameraPermissions, useMicrophonePermissions, type VideoQuality } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { VideoUtils } from '../utils/videoUtils';
 
+type VideoQualityOption = '480p' | '720p' | '1080p' | '2160p' | '4k';
+
+const VIDEO_QUALITY_MAP: Record<VideoQualityOption, VideoQuality> = {
+  '480p': '480p',
+  '720p': '720p',
+  '1080p': '1080p',
+  '2160p': '2160p',
+  '4k': '2160p',
+};
+
 export interface UseVideoRecordingOptions {
   maxDuration?: number;
-  quality?: '480p' | '720p' | '1080p' | '4k';
+  quality?: VideoQualityOption;
   albumName?: string;
   onRecordingStart?: () => void;
   onRecordingStop?: () => void;
@@ -34,10 +44,11 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
   } = options;
 
   const cameraRef = useRef<CameraView>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout>();
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [micPerm, requestMicPerm] = useMicrophonePermissions();
+  // Always call the hook (React rules), but only use it on iOS
   const [mediaLibraryPerm, requestMediaLibraryPerm] = MediaLibrary.usePermissions();
 
   const [state, setState] = useState<VideoRecordingState>({
@@ -47,6 +58,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
     hasPermissions: false,
     isInitialized: false
   });
+  const resolvedVideoQuality = VIDEO_QUALITY_MAP[quality];
 
   const updateState = useCallback((updates: Partial<VideoRecordingState>) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -62,48 +74,57 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
 
       let allGranted = true;
 
-      // Request camera permission
+      // Request camera permission explicitly
       if (!camPerm?.granted) {
         const camResult = await requestCamPerm();
         if (!camResult.granted) {
           Alert.alert(
             'Camera Permission Required',
             'Please enable camera access in your device settings to record videos.',
-            [{ text: 'OK' }]
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
           );
           allGranted = false;
         }
       }
 
-      // Request microphone permission
+      // Request microphone permission explicitly
       if (!micPerm?.granted) {
         const micResult = await requestMicPerm();
         if (!micResult.granted) {
           Alert.alert(
             'Microphone Permission Required',
             'Please enable microphone access in your device settings to record audio.',
-            [{ text: 'OK' }]
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
           );
           allGranted = false;
         }
       }
 
-      // Request media library permission
+      // Request media library permission on BOTH iOS and Android
       if (!mediaLibraryPerm?.granted) {
         const mediaResult = await requestMediaLibraryPerm();
         if (!mediaResult.granted) {
           Alert.alert(
-            'Storage Permission Required',
-            'Please enable storage access to save recorded videos.',
-            [{ text: 'OK' }]
+            'Media Library Permission Required',
+            'Please enable media library access in your device settings to save videos to gallery.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() }
+            ]
           );
           allGranted = false;
         }
       }
 
-      updateState({ 
+      updateState({
         hasPermissions: allGranted,
-        isInitialized: allGranted 
+        isInitialized: allGranted
       });
 
       return allGranted;
@@ -123,7 +144,7 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
   const stopRecordingTimer = useCallback(() => {
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = undefined;
+      recordingTimerRef.current = null;
     }
     updateState({ recordingTime: 0 });
   }, [updateState]);
@@ -150,12 +171,13 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
           if (cameraRef.current) {
             const recording = await cameraRef.current.recordAsync({
               maxDuration,
-              quality,
-              mute: false,
             });
 
             if (recording?.uri) {
               await handleRecordingComplete(recording.uri);
+            } else {
+              updateState({ isRecording: false });
+              stopRecordingTimer();
             }
           }
         } catch (recordError) {
@@ -208,11 +230,11 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
 
       // Get video metadata
       const metadata = await VideoUtils.getVideoMetadata(videoUri);
-      
-      // Show success message
+
+      // Show success message - both platforms now save to gallery
       Alert.alert(
         'Recording Saved',
-        `Video saved successfully to ${Platform.OS === 'ios' ? 'Photos' : 'Gallery'} in "${albumName}" album.${
+        `Video saved successfully to gallery in "${albumName}" album.${
           metadata ? `\n\nDuration: ${VideoUtils.formatDuration(metadata.duration)}\nSize: ${VideoUtils.formatFileSize(metadata.size)}` : ''
         }`,
         [{ text: 'OK' }]
@@ -243,22 +265,35 @@ export function useVideoRecording(options: UseVideoRecordingOptions = {}) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
+  const resetPermissions = useCallback(() => {
+    Alert.alert(
+      'Reset Permissions',
+      'To reset permissions, please go to your device settings and manually revoke permissions for this app, then restart the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() }
+      ]
+    );
+  }, []);
+
   return {
     // State
     ...state,
-    
+
     // Refs
     cameraRef,
-    
+
     // Actions
     startRecording,
     stopRecording,
     resetRecording,
     requestPermissions,
-    
+    resetPermissions,
+
     // Utilities
     formatRecordingTime: () => formatRecordingTime(state.recordingTime),
-    
+  videoQuality: resolvedVideoQuality,
+
     // Permission states
     permissions: {
       camera: camPerm?.granted || false,
